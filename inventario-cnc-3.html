@@ -1,0 +1,2089 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AGSA · Inventario CNC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<style>:root{
+  /* Fondo — más claro que antes para mejor visibilidad en laptop */
+  --bg:#1c2025;
+  --panel:#252c33;
+  --panel-raised:#2e363e;
+  --panel-hover:#343d47;
+  --border:#4a5460;
+  --border-soft:#394148;
+
+  /* Texto — más brillante para mejor contraste en pantallas con menor brillo */
+  --text:#f0ede6;
+  --text-dim:#b8c3cc;
+  --text-faint:#8a96a0;
+
+  /* Acento principal — ámbar más brillante */
+  --amber:#f5b040;
+  --amber-dim:#7a5520;
+
+  /* Acento secundario — azul-verde más saturado */
+  --teal:#45c8dd;
+  --teal-dim:#1d6a78;
+
+  /* Peligro */
+  --danger:#f06860;
+  --danger-dim:#6b2b28;
+
+  /* Bueno */
+  --good:#52cc88;
+  --good-dim:#1e5c3a;
+
+  --radius:4px;
+  --mono:'JetBrains Mono',monospace;
+  --display:'Oswald',sans-serif;
+  --body:'Inter',sans-serif;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(circle at 1px 1px, rgba(255,255,255,0.045) 1px, transparent 0) 0 0/22px 22px,
+    var(--bg);
+  color:var(--text);
+  font-family:var(--body);
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;cursor:pointer;}
+input,select,textarea{font-family:inherit;}
+
+/* -------- Topbar -------- */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 20px;border-bottom:1px solid var(--border-soft);
+  background:linear-gradient(180deg,#1e252d,#1a2028);
+  flex-wrap:wrap;gap:10px;
+  position:sticky;top:0;z-index:20;
+}
+.brand{display:flex;align-items:center;gap:12px;}
+.brand-mark{
+  width:38px;height:38px;border:2px solid var(--amber);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--display);font-size:17px;font-weight:700;color:var(--amber);
+  flex-shrink:0;
+}
+.brand-text{display:flex;flex-direction:column;line-height:1.15;}
+.brand-title{font-family:var(--display);font-size:19px;font-weight:600;letter-spacing:.3px;color:var(--text);}
+.brand-sub{font-size:11.5px;color:var(--text-dim);}
+.topnav{display:flex;gap:6px;flex-wrap:wrap;}
+.navbtn{
+  background:rgba(255,255,255,0.06);border:1px solid var(--border);color:var(--text-dim);
+  padding:7px 13px;border-radius:var(--radius);font-size:13px;font-weight:500;transition:all .15s;
+}
+.navbtn:hover{background:var(--panel-hover);color:var(--text);border-color:var(--teal);}
+.navbtn.active{background:var(--teal-dim);color:#d6f5fa;border-color:var(--teal);}
+
+/* -------- Search bar -------- */
+.searchbar{
+  display:flex;align-items:center;gap:10px;padding:10px 20px;
+  background:var(--panel);border-bottom:1px solid var(--border-soft);
+}
+.searchbar-icon{color:var(--text-dim);font-size:18px;flex-shrink:0;}
+.searchbar input{
+  flex:1;background:var(--panel-raised);border:1px solid var(--border);color:var(--text);
+  padding:9px 12px;border-radius:var(--radius);font-size:14px;
+  transition:border-color .15s;
+}
+.searchbar input::placeholder{color:var(--text-faint);}
+.searchbar input:focus{outline:none;border-color:var(--teal);background:var(--panel-hover);}
+.searchbar .icon-btn{width:34px;height:34px;flex-shrink:0;font-size:15px;}
+@media(max-width:560px){.searchbar{padding:9px 14px;}}
+
+/* -------- Breadcrumb -------- */
+.breadcrumb{
+  display:flex;align-items:center;gap:6px;padding:12px 20px 0;
+  font-family:var(--mono);font-size:12.5px;color:var(--text-faint);flex-wrap:wrap;
+}
+.breadcrumb .crumb{color:var(--text-dim);cursor:pointer;}
+.breadcrumb .crumb:hover{color:var(--teal);}
+.breadcrumb .crumb.current{color:var(--amber);cursor:default;}
+.breadcrumb .sep{color:var(--border);}
+
+main{max-width:1080px;margin:0 auto;padding:16px 20px 60px;}
+
+/* -------- Section header -------- */
+.section-head{
+  display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+  margin:6px 0 16px;flex-wrap:wrap;
+}
+.section-title{font-family:var(--display);font-size:24px;font-weight:600;margin:0;color:var(--text);}
+.section-meta{color:var(--text-dim);font-size:13px;font-family:var(--mono);}
+.section-actions{display:flex;gap:8px;flex-wrap:wrap;}
+
+/* -------- Buttons -------- */
+.btn{
+  border:1px solid var(--border);background:var(--panel-raised);color:var(--text);
+  padding:9px 14px;border-radius:var(--radius);font-size:13px;font-weight:500;
+  display:inline-flex;align-items:center;gap:7px;transition:all .15s;
+}
+.btn:hover{background:var(--panel-hover);border-color:var(--text-dim);}
+.btn-primary{background:var(--amber);border-color:var(--amber);color:#1a0c00;font-weight:700;}
+.btn-primary:hover{background:#f9c060;}
+.btn-teal{background:var(--teal-dim);border-color:var(--teal);color:#c8f2f8;font-weight:600;}
+.btn-teal:hover{background:#23788a;}
+.btn-danger{background:transparent;border-color:var(--danger-dim);color:var(--danger);}
+.btn-danger:hover{background:var(--danger-dim);color:#ffe8e7;}
+.btn-sm{padding:6px 10px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+
+/* -------- Alert panel -------- */
+.alert-panel{
+  border:1px solid #7a3530;background:linear-gradient(180deg,#2c1a18,#231413);
+  border-radius:var(--radius);padding:14px 16px;margin-bottom:18px;
+}
+.alert-panel-head{display:flex;align-items:center;gap:8px;color:#f5807a;font-weight:600;font-size:14px;margin-bottom:8px;}
+.alert-row{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:7px 0;border-top:1px solid rgba(255,255,255,0.06);font-size:13px;
+}
+.alert-row:first-child{border-top:none;}
+.alert-row .name{color:var(--text);}
+.alert-row .stat{font-family:var(--mono);color:var(--danger);font-size:12.5px;}
+
+/* -------- Folder grid -------- */
+.folder-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;
+}
+.folder-card{
+  background:var(--panel);border:1px solid var(--border-soft);border-radius:var(--radius);
+  padding:16px 14px;text-align:left;position:relative;transition:all .15s;
+  display:flex;flex-direction:column;gap:8px;min-height:108px;
+}
+.folder-card:hover{
+  border-color:var(--teal);background:var(--panel-raised);transform:translateY(-2px);
+  box-shadow:0 4px 20px rgba(0,0,0,0.3);
+}
+.folder-card .ficon{font-size:22px;}
+.folder-card .fname{
+  font-family:var(--display);font-size:15px;font-weight:500;line-height:1.25;color:var(--text);
+}
+.folder-card .fcount{font-family:var(--mono);font-size:12px;color:var(--text-dim);margin-top:auto;}
+.folder-card .fcount b{color:var(--text);font-size:14px;}
+.folder-card.low{border-color:#7a3530;}
+.folder-card.low .fcount b{color:var(--danger);}
+.folder-card .flag{
+  position:absolute;top:10px;right:10px;width:8px;height:8px;border-radius:50%;
+  background:var(--danger);box-shadow:0 0 0 3px rgba(240,104,96,0.25);
+}
+
+/* -------- Category icon colors -------- */
+.cat-cortadores .ficon{color:var(--teal);}
+.cat-brocas .ficon{color:var(--amber);}
+.cat-torno .ficon{color:#d4a060;}
+.cat-fresadora .ficon{color:#90c0e8;}
+.cat-refacciones .ficon{color:var(--text-dim);}
+.cat-machuelos .ficon{color:#b088e0;}
+.cat-boquillas .ficon{color:#78d0a8;}
+
+/* -------- Item list -------- */
+.item-list{display:flex;flex-direction:column;gap:8px;}
+.item-row{
+  background:var(--panel);border:1px solid var(--border-soft);border-radius:var(--radius);
+  padding:13px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+}
+.item-row:hover{border-color:var(--border);background:var(--panel-raised);}
+.item-main{flex:1 1 220px;min-width:0;}
+.item-title{font-weight:600;font-size:14.5px;color:var(--text);line-height:1.3;}
+.item-sub{font-size:12.5px;color:var(--text-dim);margin-top:3px;}
+.item-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
+.tag{
+  font-family:var(--mono);font-size:10.5px;color:var(--text-dim);
+  border:1px solid var(--border);padding:2px 7px;border-radius:2px;
+}
+
+/* -------- Stat boxes (filo / long / cant) -------- */
+.item-stats{display:flex;gap:20px;flex-wrap:wrap;padding:0 2px;}
+.stat-box{display:flex;flex-direction:column;gap:3px;min-width:82px;}
+.stat-box .sl{
+  font-family:var(--mono);font-size:9.5px;color:var(--text-faint);
+  text-transform:uppercase;letter-spacing:.06em;
+}
+.stat-box .sv{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--text);}
+.stat-box .sv.qtybig{font-size:20px;color:var(--good);}
+.stat-box .sv.qtybig.low{color:var(--danger);}
+
+.item-actions{display:flex;gap:6px;}
+.icon-btn{
+  width:32px;height:32px;border-radius:var(--radius);
+  border:1px solid var(--border);background:var(--panel-raised);
+  color:var(--text-dim);display:flex;align-items:center;justify-content:center;font-size:15px;
+  transition:all .15s;
+}
+.icon-btn:hover{color:var(--text);border-color:var(--text-dim);background:var(--panel-hover);}
+
+/* -------- Agg strip -------- */
+.agg-strip{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
+.agg-chip{
+  background:var(--panel);border:1px solid var(--border-soft);border-radius:var(--radius);
+  padding:8px 14px;font-size:12px;color:var(--text-dim);
+}
+.agg-chip b{color:var(--teal);font-family:var(--mono);font-size:14px;margin-left:8px;}
+
+/* -------- Modal -------- */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(8,10,12,0.78);
+  display:flex;align-items:center;justify-content:center;z-index:100;padding:16px;
+}
+.modal{
+  background:var(--panel-raised);border:1px solid var(--border);border-radius:6px;
+  width:100%;max-width:500px;max-height:90vh;overflow-y:auto;padding:22px;
+}
+.modal h3{font-family:var(--display);font-size:20px;margin:0 0 4px;font-weight:600;color:var(--text);}
+.modal p.hint{color:var(--text-dim);font-size:12.5px;margin:0 0 16px;line-height:1.5;}
+.field{margin-bottom:13px;}
+.field label{display:block;font-size:12px;font-weight:500;color:var(--text-dim);margin-bottom:5px;}
+.field input,.field select,.field textarea{
+  width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);
+  padding:9px 11px;border-radius:var(--radius);font-size:14px;transition:border-color .15s;
+}
+.field input::placeholder,.field textarea::placeholder{color:var(--text-faint);}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--teal);}
+.field-row{display:flex;gap:10px;}
+.field-row .field{flex:1;}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid var(--border-soft);}
+
+/* -------- Tipo picker (Bola / Plano) -------- */
+.tipo-picker{display:flex;gap:10px;margin-bottom:14px;}
+.tipo-opt{
+  flex:1;padding:12px 10px;border-radius:var(--radius);border:2px solid var(--border);
+  background:var(--panel);color:var(--text-dim);font-size:14px;font-weight:600;
+  display:flex;align-items:center;justify-content:center;gap:8px;transition:all .15s;
+}
+.tipo-opt .tipo-icon{font-size:18px;}
+.tipo-opt.active{border-color:var(--teal);background:var(--teal-dim);color:#c8f4f9;}
+.tipo-opt:hover:not(.active){border-color:var(--border);background:var(--panel-raised);color:var(--text);}
+
+/* -------- Medida tabs -------- */
+.medida-tabs{display:flex;gap:0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:4px;}
+.medida-tab{
+  flex:1;padding:8px 10px;border:none;background:var(--panel);color:var(--text-dim);
+  font-size:13px;font-weight:500;transition:all .15s;
+}
+.medida-tab.active{background:var(--panel-raised);color:var(--text);}
+.medida-tab:hover:not(.active){color:var(--text);}
+
+/* -------- Conversion box y name preview -------- */
+.conversion-box{
+  background:rgba(69,200,221,0.08);border:1px solid var(--teal-dim);
+  border-radius:var(--radius);padding:8px 12px;font-size:13px;color:var(--text-dim);
+  margin-top:8px;
+}
+.conv-label{color:var(--text-faint);font-size:11px;margin-right:6px;}
+.conversion-box strong{color:var(--teal);font-family:var(--mono);}
+.name-preview{
+  background:rgba(245,176,64,0.09);border:1px solid var(--amber-dim);
+  border-radius:var(--radius);padding:8px 12px;font-size:13px;color:var(--text-dim);
+  margin-bottom:4px;
+}
+.pv-label{color:var(--text-faint);font-size:11px;margin-right:6px;}
+.name-preview strong{color:var(--amber);font-family:var(--mono);}
+
+/* -------- Table -------- */
+.data-table{width:100%;border-collapse:collapse;font-size:13px;}
+.data-table th{
+  text-align:left;font-family:var(--mono);font-size:10.5px;
+  color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;
+  padding:9px 10px;border-bottom:2px solid var(--border);
+}
+.data-table td{padding:9px 10px;border-bottom:1px solid var(--border-soft);color:var(--text);}
+.data-table tr:hover td{background:rgba(255,255,255,0.03);}
+.mono{font-family:var(--mono);}
+
+/* -------- Empty state -------- */
+.empty-state{text-align:center;padding:50px 20px;color:var(--text-dim);}
+.empty-state .ei{font-size:36px;margin-bottom:12px;color:var(--text-faint);}
+.empty-state p{margin:4px 0;font-size:14px;}
+
+/* -------- Settings -------- */
+.settings-group{margin-bottom:28px;}
+.settings-group h4{font-family:var(--display);font-size:16px;margin:0 0 10px;color:var(--amber);font-weight:500;}
+.settings-row{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:10px 14px;background:var(--panel);border:1px solid var(--border-soft);
+  border-radius:var(--radius);margin-bottom:6px;
+}
+.settings-row .srname{font-size:13.5px;color:var(--text);}
+.settings-row .srstat{font-family:var(--mono);font-size:12px;color:var(--text-dim);}
+.settings-row input{
+  width:72px;background:var(--panel-raised);border:1px solid var(--border);color:var(--text);
+  padding:6px 8px;border-radius:var(--radius);font-family:var(--mono);font-size:14px;text-align:center;
+}
+
+/* -------- Toast -------- */
+.toast{
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--panel-raised);border:1px solid var(--teal);color:var(--text);
+  padding:11px 20px;border-radius:var(--radius);font-size:13px;opacity:0;pointer-events:none;
+  transition:all .25s;z-index:200;box-shadow:0 8px 28px rgba(0,0,0,0.5);
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.toast.err{border-color:var(--danger);}
+
+/* -------- Import zone -------- */
+.drop-zone{
+  border:1.5px dashed var(--border);border-radius:var(--radius);padding:24px 16px;
+  text-align:center;color:var(--text-dim);font-size:13px;margin-bottom:10px;
+}
+.drop-zone b{color:var(--teal);}
+.drop-zone input{color:var(--text-dim);}
+
+@media(max-width:560px){
+  .topbar{padding:11px 14px;}
+  main{padding:14px 14px 50px;}
+  .section-title{font-size:20px;}
+  .stat-box .sv.qtybig{font-size:17px;}
+}
+
+/* ---- Home groups ---- */
+.home-group{margin-bottom:24px;}
+.home-group-label{
+  font-family:var(--mono);font-size:10.5px;font-weight:600;text-transform:uppercase;
+  letter-spacing:.08em;color:var(--text-faint);margin-bottom:10px;padding-bottom:5px;
+  border-bottom:1px solid var(--border-soft);
+}
+
+/* ---- Vida útil ---- */
+.vu-bar-wrap{display:flex;align-items:center;gap:10px;margin-top:6px;}
+.vu-bar{flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;max-width:140px;}
+.vu-fill{height:100%;border-radius:3px;transition:width .3s;}
+.vu-fill.vu-ok{background:var(--good);}
+.vu-fill.vu-warn{background:var(--amber);}
+.vu-fill.vu-crit{background:var(--danger);}
+.vu-label{font-family:var(--mono);font-size:11px;}
+.vu-label.vu-ok{color:var(--good);}
+.vu-label.vu-warn{color:var(--amber);}
+.vu-label.vu-crit{color:var(--danger);}
+.vu-crit{color:var(--danger);}
+.vu-slider-wrap{display:flex;align-items:center;gap:12px;}
+.vu-slider-wrap input[type=range]{flex:1;accent-color:var(--teal);}
+.vu-pct-display{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--teal);min-width:46px;}
+
+/* ---- Item low highlight ---- */
+.item-low{border-color:var(--danger-dim)!important;}
+.field-row .fw{flex:1;min-width:0;}
+.ins-sub{margin:10px 0 0 18px;padding-left:14px;border-left:2px solid var(--teal-dim);}
+.ins-main.open{border-color:var(--teal);background:var(--panel-raised);}
+.ins-caret{color:var(--teal);font-size:12px;margin-left:4px;}
+.otro-input{margin-top:8px;}
+</style>
+</head>
+<body>
+<div id="toast" class="toast"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark">A</div>
+    <div class="brand-text">
+      <span class="brand-title">AGSA · Inventario CNC</span>
+      <span class="brand-sub">Herramientas y consumibles — Producción CNC</span>
+    </div>
+  </div>
+  <nav class="topnav">
+    <button class="navbtn" data-nav="home">Inicio</button>
+    <button class="navbtn" data-nav="almacen">En Almacén</button>
+    <button class="navbtn" data-nav="alertas">Alertas</button>
+    <button class="navbtn" data-nav="settings">Ajustes</button>
+    <button class="navbtn" data-nav="bajas">Bajas</button>
+    <button class="navbtn" data-nav="equivalencias">Equivalencias</button>
+  </nav>
+</header>
+
+<div class="searchbar">
+  <span class="searchbar-icon">⌕</span>
+  <input id="globalSearch" placeholder='Buscar por medida (1/4, 1/8, 5 mm...) o nombre' oninput="onGlobalSearch()" autocomplete="off">
+  <button id="searchClearBtn" class="icon-btn" style="display:none;" onclick="clearGlobalSearch()" title="Limpiar búsqueda">✕</button>
+</div>
+
+<div id="breadcrumb" class="breadcrumb"></div>
+
+<main id="app"></main>
+
+<div id="modalRoot"></div>
+
+<script>/* =========================================================================
+   DEFINICIÓN COMPLETA DE CATEGORÍAS — AGSA
+   ========================================================================= */
+
+// Cada categoría puede tener:
+//   icon: emoji
+//   grupo: para agrupar en el home
+//   sizeGrouped: true -> carpetas por medida
+//   tipoGrouped: true -> carpetas por tipo antes de medida (solo cortadores)
+//   tipos: lista fija de tipos si aplica (para modal agregar)
+//   vidaUtil: true -> tiene campo de vida útil (%)
+//   noMedida: true -> no se agrupa por medida, lista directa
+//   addFields: [] -> campos extra en el formulario
+//   Note: si no tiene sizeGrouped ni tipoGrouped -> lista directa
+
+const CATEGORIAS = {
+  // -------- HERRAMIENTA DE CORTE --------
+  cortadores: {
+    label:'Cortadores', icon:'⟡', grupo:'Herramienta de corte',
+    sizeGrouped:true, tipoGrouped:true,
+    tipos:['Bola','Plano'],
+    vidaUtil:true,
+    addFields:['filo','longitud','empaque']
+  },
+  avellanadores: {
+    label:'Avellanadores', icon:'◎', grupo:'Herramienta de corte',
+    sizeGrouped:true, vidaUtil:true,
+    addFields:['filo','longitud','empaque']
+  },
+  brocas: {
+    label:'Brocas', icon:'⟠', grupo:'Herramienta de corte',
+    sizeGrouped:true, vidaUtil:true,
+    addFields:['longitud','empaque']
+  },
+  machuelos: {
+    label:'Machuelos y tarajas', icon:'✕', grupo:'Herramienta de corte',
+    sizeGrouped:true, vidaUtil:true,
+    addFields:['paso','longitud','empaque'],
+    extraFields:[{id:'paso', label:'Paso (mm/hilos)', placeholder:'Ej. 1.25 ó 20TPI'}]
+  },
+  puntas_grabado: {
+    label:'Puntas de grabado', icon:'✦', grupo:'Herramienta de corte',
+    sizeGrouped:true, vidaUtil:true,
+    addFields:['angulo','longitud','empaque'],
+    extraFields:[{id:'angulo', label:'Ángulo (°)', placeholder:'Ej. 30, 45, 60'}]
+  },
+  cuchillas_tronzado: {
+    label:'Cuchillas de tronzado', icon:'▬', grupo:'Herramienta de corte',
+    sizeGrouped:true, vidaUtil:true,
+    addFields:['longitud','empaque']
+  },
+  cuchillas_rebabiador: {
+    label:'Cuchillas de rebabiador', icon:'◁', grupo:'Herramienta de corte',
+    sizeGrouped:false, vidaUtil:true,
+    addFields:['empaque']
+  },
+  mangos_rebabiador: {
+    label:'Mangos de desbarbador / rebabador', icon:'|', grupo:'Herramienta de corte',
+    alias:['mangos de rebabiador'],
+    sizeGrouped:false, addFields:[]
+  },
+
+  // -------- SISTEMA DE SUJECIÓN --------
+  boquillas: {
+    label:'Boquillas (Collets)', icon:'◈', grupo:'Sistema de sujeción', alias:['boquillas'],
+    sizeGrouped:true,
+    tipos:['R8','ER32','ER40','ER16','ISO','NT40','R32','Otro'],
+    addFields:['empaque'],
+    extraFields:[{id:'tipoBoquilla', label:'Tipo de boquilla', isSelect:true,
+      options:['R8','ER32','ER40','ER16','ISO','NT40','R32','Otro']}]
+  },
+  conos_fresadora: {
+    label:'Conos para fresadora', icon:'▽', grupo:'Sistema de sujeción',
+    sizeGrouped:false,
+    tipos:['R32','NT40','BT40','ISO30','Otro'],
+    addFields:[],
+    extraFields:[{id:'tipoCono', label:'Tipo de cono', isSelect:true,
+      options:['R32','NT40','BT40','ISO30','Otro']}]
+  },
+  extensiones_herramienta: {
+    label:'Extensiones de herramienta', icon:'⤳', grupo:'Sistema de sujeción',
+    sizeGrouped:true, addFields:['longitud']
+  },
+  portainsertos: {
+    label:'Portainsertos', icon:'◰', grupo:'Sistema de sujeción', alias:['porta insertos'],
+    sizeGrouped:false, vidaUtil:false, addFields:[]
+  },
+  holders_torno: {
+    label:'Holders para torno', icon:'▤', grupo:'Sistema de sujeción',
+    sizeGrouped:false, addFields:[]
+  },
+  camisas_torno: {
+    label:'Camisas para torno', icon:'◯', grupo:'Sistema de sujeción',
+    sizeGrouped:true, addFields:['longitud']
+  },
+
+  // -------- MORDAZAS Y PRENSAS --------
+  mordazas_torno: {
+    label:'Mordazas para torno', icon:'⊞', grupo:'Mordazas y prensas',
+    sizeGrouped:false, addFields:[]
+  },
+  mordazas_fresadora: {
+    label:'Mordazas para fresadora', icon:'⊟', grupo:'Mordazas y prensas',
+    sizeGrouped:false, addFields:[]
+  },
+  prensas: {
+    label:'Prensas', icon:'⊡', grupo:'Mordazas y prensas',
+    sizeGrouped:false,
+    tipos:['Mecánica','Hidráulica','Chuck'],
+    addFields:[],
+    extraFields:[{id:'tipoPresna', label:'Tipo de prensa', isSelect:true,
+      options:['Mecánica','Hidráulica','Chuck']}]
+  },
+  contra_puntos: {
+    label:'Contra puntos', icon:'◇', grupo:'Mordazas y prensas',
+    sizeGrouped:false, addFields:[]
+  },
+  juego_paralelas: {
+    label:'Juego de paralelas', icon:'≡', grupo:'Mordazas y prensas',
+    sizeGrouped:true,      // agrupado por medida (pares del juego)
+    addFields:['longitud'],
+    extraFields:[{id:'espesor', label:'Espesor (mm o fracción)', placeholder:'Ej. 10 mm, 3/8"'}]
+  },
+
+  // -------- LLAVES Y HERRAMIENTA MANUAL --------
+  llaves_allen: {
+    label:'Llaves Allen', icon:'⬡', grupo:'Herramienta manual',
+    sizeGrouped:true, addFields:[]
+  },
+  llaves_torx: {
+    label:'Llaves Torx', icon:'✱', grupo:'Herramienta manual',
+    sizeGrouped:true,
+    addFields:[],
+    extraFields:[{id:'perfilTorx', label:'Perfil Torx', placeholder:'Ej. T10, T25'}]
+  },
+  llaves_nariz: {
+    label:'Llaves de nariz', icon:'🔑', grupo:'Herramienta manual',
+    sizeGrouped:true, addFields:[]
+  },
+  llaves_espanola: {
+    label:'Llaves españolas', icon:'🔧', grupo:'Herramienta manual',
+    sizeGrouped:true, addFields:[]
+  },
+  llaves_conos: {
+    label:'Llaves para conos', icon:'🗜', grupo:'Herramienta manual', alias:['llaves para conos r32/nt'],
+    sizeGrouped:false, addFields:[]
+  },
+  llaves_torno: {
+    label:'Llaves de torno', icon:'⚙', grupo:'Herramienta manual',
+    sizeGrouped:false, addFields:[]
+  },
+  llaves_prensas: {
+    label:'Llaves para prensa', icon:'🔩', grupo:'Herramienta manual', alias:['llaves de prensas'],
+    sizeGrouped:false, addFields:[]
+  },
+  desarmadores: {
+    label:'Desarmadores / Destornilladores', icon:'⊕', grupo:'Herramienta manual', alias:['desarmadores'],
+    sizeGrouped:false,
+    tipos:['Cruz (Phillips)','Plano','Torx','Hexagonal (Allen)'],
+    addFields:[],
+    extraFields:[{id:'tipoDesarmador', label:'Tipo de punta', isSelect:true,
+      options:['Cruz (Phillips)','Plano','Torx','Hexagonal (Allen)']}]
+  },
+  pericas: {
+    label:'Pinzas y Pericas', icon:'✂', grupo:'Herramienta manual', alias:['pinzas / pericas'],
+    sizeGrouped:false, addFields:[]
+  },
+  martillos: {
+    label:'Martillos de goma', icon:'🔨', grupo:'Herramienta manual',
+    sizeGrouped:false, addFields:[]
+  },
+  marro: {
+    label:'Marros', icon:'⚒', grupo:'Herramienta manual', alias:['marro'],
+    sizeGrouped:false, addFields:[]
+  },
+  limas_joyero: {
+    label:'Limas de joyero', icon:'〜', grupo:'Herramienta manual', alias:['limas joyero'], empLabel:'Paquete',
+    sizeGrouped:false, addFields:[]
+  },
+  limas: {
+    label:'Limas (generales)', icon:'〰', grupo:'Herramienta manual', alias:['limas (media caña, bastarda, musa)'],
+    sizeGrouped:false,
+    tipos:['Media caña','Bastarda','Musa','Redonda','Plana'],
+    addFields:[],
+    extraFields:[{id:'tipoLima', label:'Tipo de lima', isSelect:true,
+      options:['Media caña','Bastarda','Musa','Redonda','Plana']}]
+  },
+  juego_clan: {
+    label:'Juego de clamps', icon:'◻', grupo:'Herramienta manual', alias:['juego de clan'], qtyLabel:'Juegos en existencia', empLabel:'Pzas por juego',
+    sizeGrouped:false, addFields:[]
+  },
+
+  // -------- INSTRUMENTOS DE MEDICIÓN --------
+  vernier: {
+    label:'Vernier / Calibrador', icon:'◤', grupo:'Instrumentos de medición',
+    sizeGrouped:false, vidaUtil:false, addFields:[],
+    extraFields:[{id:'alcance', label:'Alcance (mm)', placeholder:'Ej. 150, 300'}]
+  },
+  indicador_caratula: {
+    label:'Indicador de carátula', icon:'◎', grupo:'Instrumentos de medición',
+    sizeGrouped:false, vidaUtil:false, addFields:[],
+    extraFields:[{id:'resolucion', label:'Resolución (mm)', placeholder:'Ej. 0.01, 0.001'}]
+  },
+  base_magnetica: {
+    label:'Base magnética (indicador)', icon:'⊛', grupo:'Instrumentos de medición',
+    sizeGrouped:false, addFields:[]
+  },
+  puntas_indicador: {
+    label:'Puntas de indicador', icon:'▸', grupo:'Instrumentos de medición',
+    sizeGrouped:false, addFields:[]
+  },
+  flexometros: {
+    label:'Flexómetros', icon:'📏', grupo:'Instrumentos de medición',
+    sizeGrouped:false, addFields:[],
+    extraFields:[{id:'alcanceFlex', label:'Alcance (m)', placeholder:'Ej. 3, 5, 8'}]
+  },
+
+  // -------- INSERTOS (subcategorías del menú Insertos) --------
+  fresadora: {
+    label:'Fresadora', icon:'📄', grupo:'Insertos',
+    sizeGrouped:false, vidaUtil:false, addFields:['empaque']
+  },
+  torno: {
+    label:'Torno', icon:'📄', grupo:'Insertos',
+    sizeGrouped:false, vidaUtil:false, addFields:['empaque']
+  },
+  barras_interiores: {
+    label:'Barras de interiores', icon:'|', grupo:'Herramienta de corte',
+    sizeGrouped:true, vidaUtil:true, addFields:['longitud']
+  },
+
+  // -------- SOLUBLES / CONSUMIBLES --------
+  solubles: {
+    label:'Solubles y consumibles', icon:'💧', grupo:'Consumibles',
+    sizeGrouped:false, addFields:[],
+    extraFields:[{id:'unidad', label:'Unidad', placeholder:'Ej. litros, galones'}]
+  },
+  refacciones: {
+    label:'Refacciones / Tornillería', icon:'⬢', grupo:'Consumibles',
+    alias:['refacciones','tornillos_insertos','tornillos (insertos, piñas, kyoceras, coronas)'],
+    sizeGrouped:false, addFields:[]
+  },
+
+  // -------- EQUIPO Y TECNOLOGÍA --------
+  maquinas_cnc: {
+    label:'Máquinas del taller', icon:'🖥', grupo:'Equipo',
+    sizeGrouped:false, addFields:[],
+    extraFields:[
+      {id:'tipoMaquina', label:'Tipo de máquina', placeholder:'Ej. Centro de maquinado, Torno CNC, Fresadora'},
+      {id:'nSerie', label:'N° de serie', placeholder:''}
+    ]
+  },
+  computadoras: {
+    label:'Computadoras', icon:'💻', grupo:'Equipo',
+    sizeGrouped:false, addFields:[],
+    extraFields:[
+      {id:'tipoComp', label:'Tipo', placeholder:'Ej. Desktop, Laptop'},
+      {id:'specComp', label:'Especificación', placeholder:'Ej. i5, 8GB RAM'}
+    ]
+  },
+  discos_duros: {
+    label:'Discos duros', icon:'💾', grupo:'Equipo',
+    sizeGrouped:false, addFields:[],
+    extraFields:[{id:'capacidad', label:'Capacidad', placeholder:'Ej. 1TB, 500GB'}]
+  },
+  memorias_usb: {
+    label:'Memorias USB', icon:'📱', grupo:'Equipo',
+    sizeGrouped:false, addFields:[],
+    extraFields:[{id:'capMem', label:'Capacidad', placeholder:'Ej. 32GB, 64GB'}]
+  },
+  extensiones_luz: {
+    label:'Extensiones de luz', icon:'🔌', grupo:'Equipo',
+    sizeGrouped:false, addFields:[],
+    extraFields:[{id:'longExt', label:'Largo (m)', placeholder:'Ej. 5, 10'}]
+  },
+  calculadoras: {
+    label:'Calculadoras', icon:'🔢', grupo:'Equipo',
+    sizeGrouped:false, addFields:[]
+  },
+
+  // -------- OTROS --------
+  otros: {
+    label:'Otros', icon:'⊕', grupo:'Otros',
+    sizeGrouped:false, addFields:[]
+  }
+};
+
+// Orden de los grupos en el home
+const GRUPO_ORDER = [
+  'Herramienta de corte',
+  'Sistema de sujeción',
+  'Mordazas y prensas',
+  'Insertos',
+  'Herramienta manual',
+  'Instrumentos de medición',
+  'Consumibles',
+  'Equipo',
+  'Otros'
+];
+
+const CAT_ORDER = Object.keys(CATEGORIAS);
+
+// Busca una categoría por clave, etiqueta actual o etiqueta anterior (alias)
+function findCatKey(txt){
+  const t=String(txt==null?'':txt).toLowerCase().trim(); if(!t) return null;
+  const e=Object.entries(CATEGORIAS).find(([k,v])=>k===t||v.label.toLowerCase()===t||(v.alias||[]).some(a=>a.toLowerCase()===t));
+  return e?e[0]:null;
+}
+
+
+/* =========================================================================
+   INVENTARIO CNC — AGSA — app.js v3
+   ========================================================================= */
+
+const SEED_DATA = [{"id":"zwly8vbymrz7bm3g","categoria":"fresadora","articulo":"CORONA","marca":"KYOCERA","modelo":"PNMU1205ANER-GM","grado":"PR1210","materialTrabajo":"Fundición/Hierro (K), útil en aceros","codigo":"PNMU1205ANER-GM","medida":{"display":"","decimal":null,"mm":null},"piezasEmpaque":10,"cantidad":17,"notas":"Cortador: Corona 50 mm · Pentagonal, 10 filos "},{"id":"w67p1gbsmrz7bm3g","categoria":"fresadora","articulo":"KYOCERA 25 mm","marca":"DAGIN (grado tipo Tungaloy)","modelo":"LNMU0303ZERMJ","grado":"AH725","materialTrabajo":"Aceros e Inoxidables (buena tenacidad)","codigo":"LNMU0303ZERMJ","medida":{"display":"25 mm","decimal":0.984252,"mm":25},"piezasEmpaque":10,"cantidad":31,"notas":"Cortador: 25 mm · LNMU, 4 filos"},{"id":"x738ku8mmrz7bm3g","categoria":"fresadora","articulo":"CHINA","marca":"KYOCERA ","modelo":"LOMU100408ER-GM","grado":"PR1525","materialTrabajo":"Uso general: aceros P, M y K","codigo":"LOMU100408ER-GM","medida":{"display":"20 mm","decimal":0.787402,"mm":20},"piezasEmpaque":10,"cantidad":8,"notas":"Cortador: 20 mm · LOMU doble cara 90°, 4 filos · Radio de punta 0.8 mm"},{"id":"9k55o8x1mrz7bm3h","categoria":"brocas","articulo":"Broca CNC","marca":"Dormer","modelo":"12 mm","diametro":{"display":"12 mm","decimal":0.472441,"mm":12},"largoFilo":50,"longitudTotal":98.8,"piezasEmpaque":1,"cantidad":1},{"id":"xngkweq2mrz7bm3h","categoria":"brocas","articulo":"Broca CNC","marca":"Dormer","modelo":"1/2","diametro":{"display":"1/2\"","decimal":0.5,"mm":12.7},"largoFilo":58,"longitudTotal":105,"piezasEmpaque":1,"cantidad":1},{"id":"esdnn6rgmrz7bm3h","categoria":"brocas","articulo":"Broca CNC","marca":"Dormer","modelo":"10 mm","diametro":{"display":"10 mm","decimal":0.393701,"mm":10},"largoFilo":47,"longitudTotal":89.3,"piezasEmpaque":1,"cantidad":1},{"id":"v2snfaz0mrz7bm3h","categoria":"brocas","articulo":"Broca CNC","marca":"Dormer","modelo":"3/8","diametro":{"display":"3/8\"","decimal":0.375,"mm":9.525},"largoFilo":46,"longitudTotal":89,"piezasEmpaque":1,"cantidad":1},{"id":"7jtfnvnymrz7bm3h","categoria":"brocas","articulo":"Broca CNC","marca":"Dormer","modelo":"3/16","diametro":{"display":"3/16\"","decimal":0.1875,"mm":4.762},"largoFilo":29.5,"longitudTotal":66,"piezasEmpaque":1,"cantidad":1},{"id":"ldjr07mdmrz7bm3h","categoria":"brocas","articulo":"Broca CNC","marca":"Dormer","modelo":"5/16","diametro":{"display":"5/16\"","decimal":0.3125,"mm":7.938},"largoFilo":34,"longitudTotal":76.6,"piezasEmpaque":1,"cantidad":1},{"id":"hx9e253mmrz7bm3h","categoria":"brocas","articulo":"Broca CNC LARGA","marca":"Dormer","modelo":"5/16","diametro":{"display":"5/16\"","decimal":0.3125,"mm":7.938},"largoFilo":64,"longitudTotal":118,"piezasEmpaque":1,"cantidad":1},{"id":"8fprczaumrz7bm3h","categoria":"refacciones","articulo":"Tornillo para Corona 50 mm","herramientaAsignada":"Corona 50 mm","piezasEmpaque":null,"cantidad":0},{"id":"1lmg7h3gmrz7bm3h","categoria":"refacciones","articulo":"Tornillo para cortador Kyocera 25 mm","herramientaAsignada":"Cortador Kyocera 25 mm","piezasEmpaque":null,"cantidad":0},{"id":"r86len27mrz7bm3h","categoria":"refacciones","articulo":"Tornillo para cortador China 20 mm","herramientaAsignada":"Cortador China 20 mm","piezasEmpaque":null,"cantidad":0},{"id":"tgbj1nhtmrz7bm3h","categoria":"refacciones","articulo":"Caja de Rebabeadores","herramientaAsignada":"Rebabeadores generales","piezasEmpaque":9,"cantidad":3},{"categoria":"torno","articulo":"Inserto para tronzador 3mm","marca":"KORLOY","modelo":"SP300","codigo":"SP300-PC9030 (SKU: 1-03-036251)","grado":"PC9030","materialTrabajo":"Acero Inoxidable (Clasificación M)","medida":{"display":"","decimal":null,"mm":null},"piezasEmpaque":10,"cantidad":19,"notas":"(HERRAMIENTA 3)_______ Grosor de corte: 3 mm","id":"nquep53nmrz7v4ui"},{"categoria":"torno","articulo":"Inserto para tronzador 3mm","marca":"KORLOY","modelo":"SP300","codigo":"SP300-NC3030","grado":"NC3030","materialTrabajo":"Acero (Clasificación P)","medida":{"display":"","decimal":null,"mm":null},"piezasEmpaque":10,"cantidad":28,"notas":"(HERRAMIENTA 3)_______ Grosor de corte: 3 mm","id":"qd4h4i3xmrz810w4"},{"categoria":"torno","articulo":"Inserto para ranurado / tronzador 1.5 mm","marca":"KORLOY","modelo":"MGMN150-G","codigo":"MGMN150-G PC9030","grado":"PC9030","materialTrabajo":"Acero Inoxidable (Clasificación M)","medida":{"display":"","decimal":null,"mm":null},"piezasEmpaque":10,"cantidad":25,"notas":"(HERRAMIENTA 9)_______ Grosor de corte: 1.5 mm","id":"gs2b6iyxmrz8a6d8"},{"categoria":"torno","articulo":"Inserto para ranurado / tronzador 3mm","marca":"KORLOY","modelo":"MGMN300-M","codigo":"MGMN300-M PC9030","grado":"PC9030","materialTrabajo":"Acero Inoxidable (Clasificación M)","medida":{"display":"3 mm","decimal":0.11811,"mm":3},"piezasEmpaque":10,"cantidad":8,"notas":"Grosor de corte: 3 mm","id":"asevxwd8mrz8dblo"},{"categoria":"torno","articulo":"Inserto para ranurado / tronzador 3mm","marca":"KEENCUTEER","modelo":"MGMN300-M","codigo":"MGMN300-M KT930","grado":"KT930","materialTrabajo":"Acero / Acero Inoxidable","medida":{"display":"3 mm","decimal":0.11811,"mm":3},"piezasEmpaque":10,"cantidad":9,"notas":"Grosor de corte: 3 mm","id":"wiegj97jmrz8fjru"},{"categoria":"torno","articulo":"Inserto para barra de interiores (torneado interior) 0.4 mm","marca":" CDBP","modelo":"CCMT060204-MX","codigo":"CCMT060204-MX BPU206","grado":"BPU206","materialTrabajo":"Acero Inoxidable / Acero (Clasificación M / P)","medida":{"display":"0.4 mm","decimal":0.015748,"mm":0.4},"piezasEmpaque":10,"cantidad":8,"notas":"Radio de punta: 0.4 mm","id":"pjxxhu1gmrz8jove"},{"categoria":"torno","articulo":"Inserto para torneado  (35°) 0.4 mm","marca":"MITSUBISHI (Diaedge)","modelo":"VNMG160404 MA (VNMG331MA)","codigo":"VNMG160404 MA VP15TF","grado":"VP15TF","materialTrabajo":"Acero, Acero Inoxidable y Fundición (Clasificaciones P, M, K)","medida":{"display":"","decimal":null,"mm":null},"piezasEmpaque":10,"cantidad":29,"notas":"​Radio de punta: 0.4 mm  (herramienta 2)","id":"hpej2hfdmrz8naf3"},{"categoria":"torno","articulo":"Inserto para desbaste / torneado 0.8 mm","marca":"ISCAR","modelo":"CNMG120408-TF","codigo":"CNMG120408-TF IC907","grado":"IC907","materialTrabajo":"Multimaterial / Inoxidable / Aceros","medida":{"display":"","decimal":null,"mm":null},"piezasEmpaque":10,"cantidad":13,"notas":"Radio de punta: 0.8 mm","id":"4x8buip2mrz9337p"},{"categoria":"torno","articulo":"Inserto para desbaste / torneado 0.8 mm","marca":"KYOCERA","modelo":"CNMG120408PQ (CNMG432PQ)","codigo":"CNMG120408PQ CA025P","grado":"CA025P","materialTrabajo":"Acero (Clasificación P)","medida":{"display":"0.8 mm","decimal":0.031496,"mm":0.8},"piezasEmpaque":10,"cantidad":2,"notas":"Radio de punta: 0.8 mm","id":"5k5pj4l9mrz96kxr"},{"categoria":"torno","articulo":"Inserto para desbaste / torneado 0.8 mm","marca":"AleRo","modelo":"CNMG120408 M30","codigo":"CNMG120408 M30 AUP035","grado":"AUP035","materialTrabajo":"Acero, Inoxidable y Fundición (P, M, K)","medida":{"display":"0.8  mm","decimal":0.031496,"mm":0.8},"piezasEmpaque":10,"cantidad":6,"notas":"Radio de punta: 0.8 mm","id":"7eezvs8wmrz9dw83"},{"categoria":"torno","articulo":"Inserto para torneado / desbaste ligero 0.4 mm","marca":"Palbit (by Toolmex)","modelo":"CNMG 120404-MF (CNMG 431-MF)","codigo":"CNMG 120404-MF PHG115","grado":"PHG115","materialTrabajo":"Acero (Clasificación P)","medida":{"display":"0.4 mm","decimal":0.015748,"mm":0.4},"piezasEmpaque":10,"cantidad":8,"notas":"Radio de punta: 0.4 mm","id":"pbds21ugmrz9h9o5"},{"categoria":"torno","articulo":"Inserto para torneado / desbaste ligero 0.4 mm","marca":"AleRo","modelo":"CNMG120404 MA (CNMG431-MA)","codigo":"CNMG120404 MA AUX105F","grado":"AUX105F","materialTrabajo":"Acero y Acero Inoxidable (P, M)","medida":{"display":"0.4 mm","decimal":0.015748,"mm":0.4},"piezasEmpaque":10,"cantidad":11,"notas":"Radio de punta: 0.4 mm","id":"7trv5vmlmrz9lbiz"},{"categoria":"torno","articulo":"Inserto para torneado / desbaste ligero 0.4 mm","marca":"KORLOY","modelo":"CNMG120404-HA (CNMG431-HA)","codigo":"CNMG120404-HA PC9030","grado":"PC9030","materialTrabajo":"Acero Inoxidable y Aceros (Clasificaciones M, P)","medida":{"display":"0.4 mm","decimal":0.015748,"mm":0.4},"piezasEmpaque":10,"cantidad":10,"notas":"Radio de punta: 0.4 mm","id":"o2so38dgmrz9r6cw"},{"categoria":"brocas","articulo":"Broca CNC","marca":"DOMER","modelo":"1/4","diametro":{"display":"1/4\"","decimal":0.25,"mm":6.35},"largoFilo":50,"longitudTotal":109.62,"piezasEmpaque":1,"cantidad":1,"id":"l7fft8p2mrzan6vg"},{"categoria":"brocas","articulo":"Broca CNC","marca":"DOMER","modelo":"4 mm","diametro":{"display":"4 mm","decimal":0.15748,"mm":4},"largoFilo":36,"longitudTotal":93,"piezasEmpaque":1,"cantidad":1,"id":"7680vuo3mrzar8yo"},{"categoria":"brocas","articulo":"Broca CNC","marca":"DOMER","modelo":"6 mm","diametro":{"display":"","decimal":null,"mm":null},"largoFilo":47,"longitudTotal":100.5,"piezasEmpaque":1,"cantidad":1,"id":"3inqldiamrzatgvc"},{"categoria":"brocas","articulo":"Broca CNC","marca":"DOMER","modelo":"7 mm","diametro":{"display":"7 mm","decimal":0.275591,"mm":7},"largoFilo":50,"longitudTotal":105.8,"piezasEmpaque":1,"cantidad":1,"id":"b6jd71s3mrzaz4ie"},{"categoria":"brocas","articulo":"Broca CNC","marca":"DOMER","modelo":"10 mm","diametro":{"display":"10 mm","decimal":0.393701,"mm":10},"largoFilo":78,"longitudTotal":136.6,"piezasEmpaque":1,"cantidad":1,"id":"ivgvjgzdmrzb0k6o"},{"categoria":"brocas","articulo":"Broca CNC","marca":"DOMER","modelo":"9 mm","diametro":{"display":"9 mm","decimal":0.354331,"mm":9},"largoFilo":66.7,"longitudTotal":124.4,"piezasEmpaque":1,"cantidad":1,"id":"sxfvfpt5mrzb1wy2"},{"categoria":"brocas","articulo":"Broca CNC","marca":"DOMER","modelo":"6 mm","diametro":{"display":"","decimal":null,"mm":null},"largoFilo":29.4,"longitudTotal":66.55,"piezasEmpaque":1,"cantidad":1,"id":"zdx2wlrcmrzb428v"},{"categoria":"brocas","articulo":"Broca CNC","marca":"DOMER","modelo":"6 mm","diametro":{"display":"","decimal":null,"mm":null},"largoFilo":51,"longitudTotal":8.28,"piezasEmpaque":1,"cantidad":1,"id":"hb9noxmdmrzb56wj"},{"categoria":"brocas","articulo":"Broca CNC","marca":"DOMER","modelo":"6.5 mm","diametro":{"display":"6.5 mm","decimal":0.255906,"mm":6.5},"largoFilo":32,"longitudTotal":77.4,"piezasEmpaque":1,"cantidad":1,"id":"27gqjvjtmrzb7g3s"},{"categoria":"brocas","articulo":"Broca CNC","marca":"DOMER","modelo":"8.5 mm","diametro":{"display":"8.5 mm","decimal":0.334646,"mm":8.5},"largoFilo":67,"longitudTotal":128.3,"piezasEmpaque":1,"cantidad":1,"id":"869x9s81mrzb909s"},{"categoria":"brocas","articulo":"Broca CNC","marca":"DOMER","modelo":"7 mm","diametro":{"display":"7 mm","decimal":0.275591,"mm":7},"largoFilo":54,"longitudTotal":106,"piezasEmpaque":1,"cantidad":1,"id":"dd0iijhbmrzbay3d"},{"categoria":"brocas","articulo":"Broca CNC","marca":"DOMER","modelo":"5 mm","diametro":{"display":"5 mm","decimal":0.19685,"mm":5},"largoFilo":29,"longitudTotal":66,"piezasEmpaque":1,"cantidad":1,"id":"brhtzh95mrzbcrjf"},{"categoria":"brocas","articulo":"Broca CNC","marca":"DOMER","modelo":"9/16","diametro":{"display":"9/16\"","decimal":0.5625,"mm":14.287},"largoFilo":126,"longitudTotal":171,"piezasEmpaque":1,"cantidad":1,"id":"tkkfm6fkmrzbg3g3"},{"categoria":"brocas","articulo":"Broca CNC","marca":"DOMER","modelo":"27/64","diametro":{"display":"27/64\"","decimal":0.421875,"mm":10.716},"largoFilo":54,"longitudTotal":102,"piezasEmpaque":1,"cantidad":1,"id":"sq79k6wsmrzbkspl"},{"categoria":"brocas","articulo":"Broca CNC","marca":"DOMER","modelo":"17/64","diametro":{"display":"17/64\"","decimal":0.265625,"mm":6.747},"largoFilo":56,"longitudTotal":109.66,"piezasEmpaque":1,"cantidad":1,"id":"vzbvtl4kmrzbmk8d"},{"categoria":"brocas","articulo":"Broca CNC","marca":"DOMER","modelo":"8.7 mm ","diametro":{"display":"8.7 mm","decimal":0.34252,"mm":8.7},"largoFilo":45,"longitudTotal":101.6,"piezasEmpaque":1,"cantidad":1,"id":"r9nq588gmrzboogx"},{"categoria":"brocas","articulo":"Broca CNC","marca":"DOMER","modelo":"1/4","diametro":{"display":"1/4\"","decimal":0.25,"mm":6.35},"largoFilo":36,"longitudTotal":79.35,"piezasEmpaque":1,"cantidad":1,"id":"e6khebtamrzbrhxx"},{"categoria":"brocas","articulo":"Broca CNC","marca":"DOMER","modelo":"7/16","diametro":{"display":"7/16\"","decimal":0.4375,"mm":11.112},"largoFilo":47,"longitudTotal":94,"piezasEmpaque":1,"cantidad":1,"id":"bcnl6y7nmrzbt5ss"},{"categoria":"brocas","articulo":"Broca CNC","marca":"DOMER","modelo":"8 mm","diametro":{"display":"8 mm","decimal":0.314961,"mm":8},"largoFilo":75,"longitudTotal":118.7,"piezasEmpaque":1,"cantidad":1,"id":"uw8xqdzomrzbw683"},{"categoria":"brocas","articulo":"Broca CNC","marca":"DOMER","modelo":"10 mm","diametro":{"display":"10 mm","decimal":0.393701,"mm":10},"largoFilo":86,"longitudTotal":137,"piezasEmpaque":1,"cantidad":1,"id":"h4jqqdn3mrzbxfxp"},{"categoria":"brocas","articulo":"Broca CNC","marca":"DOMER","modelo":"12 mm ","diametro":{"display":"12 mm","decimal":0.472441,"mm":12},"largoFilo":60,"longitudTotal":117.95,"piezasEmpaque":1,"cantidad":1,"id":"vksa7u5bmrzbyx7r"},{"categoria":"brocas","articulo":"Broca CNC","marca":"","modelo":"3 mm","diametro":{"display":"3 mm","decimal":0.11811,"mm":3},"largoFilo":32.55,"longitudTotal":60.3,"piezasEmpaque":1,"cantidad":1,"id":"cu6w3miqmrzc53wd"},{"categoria":"brocas","articulo":"Broca CNC","marca":"","modelo":"3 mm","diametro":{"display":"3 mm","decimal":0.11811,"mm":3},"largoFilo":67.5,"longitudTotal":102,"piezasEmpaque":1,"cantidad":1,"id":"p90e7xpimrzc6g57"},{"categoria":"brocas","articulo":"Broca CNC","marca":"","modelo":"3 mm","diametro":{"display":"3 mm","decimal":0.11811,"mm":3},"largoFilo":58.3,"longitudTotal":106.67,"piezasEmpaque":1,"cantidad":1,"id":"abw8goqamrzc80r1"},{"categoria":"brocas","articulo":"Broca CNC","marca":"","modelo":"2.5 mm","diametro":{"display":"2.5 mm","decimal":0.098425,"mm":2.5},"largoFilo":28,"longitudTotal":55.58,"piezasEmpaque":1,"cantidad":1,"id":"6hgkbksdmrzcar0e"},{"categoria":"brocas","articulo":"Broca CNC","marca":"","modelo":"1/8","diametro":{"display":"1/8\"","decimal":0.125,"mm":3.175},"largoFilo":42,"longitudTotal":71,"piezasEmpaque":1,"cantidad":1,"id":"2l74k2womrzcewsa"},{"categoria":"brocas","articulo":"Broca CNC","marca":"","modelo":"1/8","diametro":{"display":"1/8\"","decimal":0.125,"mm":3.175},"largoFilo":71,"longitudTotal":132.67,"piezasEmpaque":1,"cantidad":1,"id":"22ivb7pumrzcgatk"},{"categoria":"brocas","articulo":"Broca CNC","marca":"WESTON","modelo":"5/32","diametro":{"display":"5/32\"","decimal":0.15625,"mm":3.969},"largoFilo":76,"longitudTotal":137.78,"piezasEmpaque":1,"cantidad":1,"id":"9se5kz4cmrzd9w98"},{"categoria":"brocas","articulo":"Broca CNC","marca":"","modelo":"8.5 mm","diametro":{"display":"8.5 mm","decimal":0.334646,"mm":8.5},"largoFilo":110,"longitudTotal":165.8,"piezasEmpaque":1,"cantidad":3,"id":"do4uypc7mrzdex5p"},{"categoria":"brocas","articulo":"Broca CNC","marca":"DOMER","modelo":"29/64","diametro":{"display":"29/64\"","decimal":0.453125,"mm":11.509},"largoFilo":52.3,"longitudTotal":99.23,"piezasEmpaque":1,"cantidad":1,"id":"x5g42s61mrzdidjl"},{"categoria":"brocas","articulo":"Broca CNC","marca":"DOMER","modelo":"11/32","diametro":{"display":"11/32\"","decimal":0.34375,"mm":8.731},"largoFilo":45.6,"longitudTotal":87.7,"piezasEmpaque":1,"cantidad":1,"id":"zpvv8vqbmrzdlven"},{"categoria":"brocas","articulo":"Broca CNC","marca":"DOMER","modelo":"5/16","diametro":{"display":"5/16\"","decimal":0.3125,"mm":7.938},"largoFilo":42,"longitudTotal":79.56,"piezasEmpaque":1,"cantidad":1,"id":"6jw83fenmrzdp5av"},{"categoria":"brocas","articulo":"Broca CNC","marca":"DOMER","modelo":"7/32","diametro":{"display":"7/32\"","decimal":0.21875,"mm":5.556},"largoFilo":28.8,"longitudTotal":66,"piezasEmpaque":1,"cantidad":1,"id":"w5ssb8cgmrze54y3"},{"categoria":"brocas","articulo":"Broca CNC","marca":"DOMER","modelo":"11/64","diametro":{"display":"11/64\"","decimal":0.171875,"mm":4.366},"largoFilo":25.6,"longitudTotal":66.33,"piezasEmpaque":1,"cantidad":1,"id":"hmm4vtlemrze6in1"},{"categoria":"brocas","articulo":"Broca CNC","marca":"DOMER","modelo":"7/32","diametro":{"display":"7/32\"","decimal":0.21875,"mm":5.556},"largoFilo":46,"longitudTotal":100.6,"piezasEmpaque":1,"cantidad":1,"id":"2u8hnz6qmrze911j"},{"categoria":"brocas","articulo":"Broca CNC","marca":"","modelo":"1/4","diametro":{"display":"1/4\"","decimal":0.25,"mm":6.35},"largoFilo":52,"longitudTotal":83,"piezasEmpaque":1,"cantidad":2,"id":"4kbhj9aamrzes6sm"},{"categoria":"brocas","articulo":"Broca CNC","marca":"","modelo":"2 mm","diametro":{"display":"2 mm","decimal":0.07874,"mm":2},"largoFilo":26,"longitudTotal":52,"piezasEmpaque":1,"cantidad":1,"id":"jdwm6cbimrzew22y"},{"categoria":"brocas","articulo":"Broca CNC","marca":"","modelo":"10 mm","diametro":{"display":"10 mm","decimal":0.393701,"mm":10},"largoFilo":80,"longitudTotal":130.4,"piezasEmpaque":1,"cantidad":1,"id":"74ko84brmrzf5yrw"},{"categoria":"brocas","articulo":"Broca CNC","marca":"","modelo":"25/64","diametro":{"display":"25/64\"","decimal":0.390625,"mm":9.922},"largoFilo":95.3,"longitudTotal":130.87,"piezasEmpaque":1,"cantidad":1,"id":"ocnxszlgmrzf8cl0"},{"categoria":"brocas","articulo":"Broca CNC","marca":"","modelo":"2 mm","diametro":{"display":"2 mm","decimal":0.07874,"mm":2},"largoFilo":23.6,"longitudTotal":44.41,"piezasEmpaque":1,"cantidad":1,"id":"y9c95pz5mrzfbbdq"},{"categoria":"brocas","articulo":"Broca CNC","marca":"","modelo":"1/16","diametro":{"display":"1/16\"","decimal":0.0625,"mm":1.587},"largoFilo":23,"longitudTotal":48.48,"piezasEmpaque":1,"cantidad":1,"id":"5ws4yzusmrzfdsmc"},{"categoria":"brocas","articulo":"Broca CNC","marca":"pendiente","modelo":"13/32","diametro":{"display":"","decimal":null,"mm":null},"largoFilo":null,"longitudTotal":null,"piezasEmpaque":1,"cantidad":1,"id":"yritr4gsmrzfuxu7"},{"categoria":"brocas","articulo":"Broca CNC","marca":"","modelo":"1/8","diametro":{"display":"1/8\"","decimal":0.125,"mm":3.175},"largoFilo":48.9,"longitudTotal":22.8,"piezasEmpaque":1,"cantidad":1,"id":"3soxoltrmrzmobiu"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"0.35 mm","diametro":{"display":"0.35 mm","decimal":0.01378,"mm":0.35},"largoFilo":3.5,"longitudTotal":29.5,"piezasEmpaque":1,"cantidad":1,"id":"efua2w6cms4rtr7x"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"0.6 mm Bola ","diametro":{"display":"","decimal":null,"mm":null},"largoFilo":3.6,"longitudTotal":28.36,"piezasEmpaque":1,"cantidad":1,"id":"0ei01jdrms4rwrxt"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"1 mm Bola ","diametro":{"display":"","decimal":null,"mm":null},"largoFilo":4,"longitudTotal":38,"piezasEmpaque":1,"cantidad":1,"id":"j2w0x269ms4rxsrb"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"1 mm Bola","diametro":{"display":"","decimal":null,"mm":null},"largoFilo":4,"longitudTotal":38.25,"piezasEmpaque":1,"cantidad":2,"id":"rxaa3or6ms4s27w9"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"1 mm Bola ","diametro":{"display":"","decimal":null,"mm":null},"largoFilo":3.6,"longitudTotal":22,"piezasEmpaque":1,"cantidad":1,"id":"mdy9t43vms4s5dgt"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"2 mm","diametro":{"display":"2 mm","decimal":0.07874,"mm":2},"largoFilo":13,"longitudTotal":54.22,"piezasEmpaque":1,"cantidad":2,"id":"ktj42p1cms4sbawd"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"2 mm BOLA","diametro":{"display":"","decimal":null,"mm":null},"largoFilo":7.3,"longitudTotal":38.8,"piezasEmpaque":1,"cantidad":2,"id":"c9ryubcgms4sdtej"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"2 mm BOLA","diametro":{"display":"","decimal":null,"mm":null},"largoFilo":6.9,"longitudTotal":38,"piezasEmpaque":1,"cantidad":1,"id":"rxlzw2xkms4sftd5"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"3mm","diametro":{"display":"3 mm","decimal":0.11811,"mm":3},"largoFilo":11.7,"longitudTotal":38.28,"piezasEmpaque":1,"cantidad":3,"id":"r6in6brams4skw13"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"3mm  Bola ","diametro":{"display":"3 mm","decimal":0.11811,"mm":3},"largoFilo":5.5,"longitudTotal":49.5,"piezasEmpaque":1,"cantidad":1,"id":"bvs4yuxims4snfxb"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"3mm Bola ","diametro":{"display":"3 mm","decimal":0.11811,"mm":3},"largoFilo":9,"longitudTotal":57.5,"piezasEmpaque":1,"cantidad":1,"id":"rlfz3ad6ms4soy1x"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"6 mm Plana ","diametro":{"display":"","decimal":null,"mm":null},"largoFilo":33,"longitudTotal":79.5,"piezasEmpaque":1,"cantidad":2,"id":"3ar58ps5ms4t0dwf"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"6mm Plana ","diametro":{"display":"6 mm","decimal":0.23622,"mm":6},"largoFilo":12,"longitudTotal":58,"piezasEmpaque":1,"cantidad":2,"id":"b0gqfixdms4t488l"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"6mm Plana ","diametro":{"display":"6 mm","decimal":0.23622,"mm":6},"largoFilo":24.5,"longitudTotal":75.3,"piezasEmpaque":1,"cantidad":1,"id":"g5gfarrgms4t62et"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"6 mm Bola ","diametro":{"display":"6 mm","decimal":0.23622,"mm":6},"largoFilo":13,"longitudTotal":57.5,"piezasEmpaque":1,"cantidad":1,"id":"me7et4yoms4t7kmd"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"6mm Plana ","diametro":{"display":"6 mm","decimal":0.23622,"mm":6},"largoFilo":15,"longitudTotal":56,"piezasEmpaque":1,"cantidad":1,"id":"p0bkoeizms4td6m1"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"8 mm Plana ","diametro":{"display":"8 mm","decimal":0.314961,"mm":8},"largoFilo":19,"longitudTotal":63.5,"piezasEmpaque":1,"cantidad":1,"id":"h4pstlhsms4tpaa8"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"8mm Plana tornasol ","diametro":{"display":"8 mm","decimal":0.314961,"mm":8},"largoFilo":20.3,"longitudTotal":64,"piezasEmpaque":1,"cantidad":1,"id":"8zklanatms4tsj62"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"8mm Plana ","diametro":{"display":"8 mm","decimal":0.314961,"mm":8},"largoFilo":25,"longitudTotal":63.5,"piezasEmpaque":1,"cantidad":1,"id":"jnypf6a8ms4turxm"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"8mm Plana hss","diametro":{"display":"8 mm","decimal":0.314961,"mm":8},"largoFilo":21,"longitudTotal":60,"piezasEmpaque":1,"cantidad":1,"id":"o1diuyfhms4tx1fi"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"4mm Plana ","diametro":{"display":"4 mm","decimal":0.15748,"mm":4},"largoFilo":10,"longitudTotal":50,"piezasEmpaque":1,"cantidad":3,"id":"i0m7k9tcms4vjid1"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"4mm Plana ","diametro":{"display":"4 mm","decimal":0.15748,"mm":4},"largoFilo":25.5,"longitudTotal":67,"piezasEmpaque":1,"cantidad":1,"id":"hvtrilknms4vonfd"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"4mm Plana ","diametro":{"display":"4 mm","decimal":0.15748,"mm":4},"largoFilo":14,"longitudTotal":58,"piezasEmpaque":1,"cantidad":2,"id":"8j52d278ms4w1qtp"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"4mm Plana ","diametro":{"display":"4 mm","decimal":0.15748,"mm":4},"largoFilo":10,"longitudTotal":29,"piezasEmpaque":1,"cantidad":1,"id":"ovzw0zbmms4w8k13"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"12mm Bola","diametro":{"display":"12 mm","decimal":0.472441,"mm":12},"largoFilo":27,"longitudTotal":83,"piezasEmpaque":1,"cantidad":2,"id":"nzjo1f9pms4wpxed"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"12mm Plana ","diametro":{"display":"12 mm","decimal":0.472441,"mm":12},"largoFilo":25,"longitudTotal":75,"piezasEmpaque":1,"cantidad":1,"id":"2st06xk0ms4wsfqu"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"12 mm Plana ","diametro":{"display":"12 mm","decimal":0.472441,"mm":12},"largoFilo":31,"longitudTotal":80,"piezasEmpaque":1,"cantidad":1,"id":"lrpg27k8ms4wver4"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"12mm  Plana ","diametro":{"display":"12 mm","decimal":0.472441,"mm":12},"largoFilo":27,"longitudTotal":84,"piezasEmpaque":1,"cantidad":1,"id":"iets7gcnms4wz2od"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"12mm Plana ","diametro":{"display":"12 mm","decimal":0.472441,"mm":12},"largoFilo":50,"longitudTotal":102,"piezasEmpaque":1,"cantidad":1,"id":"uzvrdh85ms4x1fol"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"1/8","diametro":{"display":"1/8\"","decimal":0.125,"mm":3.175},"largoFilo":13,"longitudTotal":39,"piezasEmpaque":1,"cantidad":2,"id":"rkas59b0ms4y6b1r"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"1/8 Bola ","diametro":{"display":"","decimal":null,"mm":null},"largoFilo":28,"longitudTotal":38,"piezasEmpaque":1,"cantidad":2,"id":"edbwpnpoms4y8gy3"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"1/8 Bola ","diametro":{"display":"1/8\"","decimal":0.125,"mm":3.175},"largoFilo":12,"longitudTotal":38.5,"piezasEmpaque":1,"cantidad":3,"id":"81z7tkfwms4yb36p"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"1/8 Bola ","diametro":{"display":"1/8\"","decimal":0.125,"mm":3.175},"largoFilo":6.5,"longitudTotal":38.8,"piezasEmpaque":1,"cantidad":2,"id":"ucp4rn0nms4ydquv"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"1/8 Plana","diametro":{"display":"","decimal":null,"mm":null},"largoFilo":28.1,"longitudTotal":41.51,"piezasEmpaque":1,"cantidad":2,"id":"zwdxvpbnms4yhezb"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"1/8 Plana ","diametro":{"display":"","decimal":null,"mm":null},"largoFilo":15,"longitudTotal":102,"piezasEmpaque":1,"cantidad":1,"id":"f7f0stv2ms4ym71o"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"1/8 Plana ","diametro":{"display":"1/8\"","decimal":0.125,"mm":3.175},"largoFilo":29,"longitudTotal":102.5,"piezasEmpaque":1,"cantidad":1,"id":"6hvdqoewms4ynhs5"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"1/2 Plana ","diametro":{"display":"","decimal":null,"mm":null},"largoFilo":25,"longitudTotal":76.5,"piezasEmpaque":1,"cantidad":1,"id":"ykhs77w8ms57afl7"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"1/2 Plana hss","diametro":{"display":"1-2\"","decimal":1,"mm":25.4},"largoFilo":30,"longitudTotal":81.5,"piezasEmpaque":1,"cantidad":1,"id":"im8dfn8rms57chzt"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"1/16 Plana ","diametro":{"display":"1/16\"","decimal":0.0625,"mm":1.587},"largoFilo":4,"longitudTotal":38.5,"piezasEmpaque":1,"cantidad":2,"id":"u4zwukugms57nzkk"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"1/16 Bola ","diametro":{"display":"1/16\"","decimal":0.0625,"mm":1.587},"largoFilo":6,"longitudTotal":39,"piezasEmpaque":1,"cantidad":2,"id":"eeacq61qms57q7ra"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"1/16 Plana ","diametro":{"display":"1/16\"","decimal":0.0625,"mm":1.587},"largoFilo":14,"longitudTotal":47.9,"piezasEmpaque":1,"cantidad":2,"id":"lmvf9myqms57s2xw"},{"categoria":"cortadores","articulo":"Cortador CNC","marca":"","modelo":"1/16","diametro":{"display":"1/16\"","decimal":0.0625,"mm":1.587},"largoFilo":4,"longitudTotal":38.5,"piezasEmpaque":1,"cantidad":1,"id":"snzqs5f3ms57t6ar"}];
+
+let INVENTARIO = [];
+let BAJAS = [];
+let MINIMOS = {};
+
+const state = {
+  view: 'home',     // home | categoria | tipo | size | settings | bajas | equivalencias | alertas
+  categoria: null,
+  tipo: null,
+  sizeKey: null,
+  searchQuery: '',
+  editId: null
+};
+
+/* =========================================================================
+   STORAGE
+   ========================================================================= */
+async function storeGet(key, fallback){
+  try{ const r=await window.storage.get(key,false); return r&&r.value!==undefined?JSON.parse(r.value):fallback; }
+  catch(e){ return fallback; }
+}
+async function storeSet(key,val){
+  try{ await window.storage.set(key,JSON.stringify(val),false); return true; }
+  catch(e){ console.error('storage',e); return false; }
+}
+async function loadAll(){
+  INVENTARIO = await storeGet('inventario3', null);
+  if(!INVENTARIO){ INVENTARIO = migrateSeed(SEED_DATA); await storeSet('inventario3', INVENTARIO); }
+  else {
+    const before=JSON.stringify(INVENTARIO);
+    INVENTARIO = INVENTARIO.map(limpiarItem);
+    if(JSON.stringify(INVENTARIO)!==before) await storeSet('inventario3', INVENTARIO);
+  }
+  BAJAS    = await storeGet('bajas', []);
+  BAJAS.forEach(b=>{ delete b.modelo; if(b.categoria==='tornillos_insertos') b.categoria='refacciones'; });
+  MINIMOS  = await storeGet('minimos', {});
+}
+function migrateSeed(data){
+  return data.map(it=>{
+    if(!CATEGORIAS[it.categoria] && it.categoria){
+      const k = findCatKey(it.categoria);
+      if(k) it.categoria = k;
+    }
+    if(!it.id) it.id = genId('itm');
+    limpiarItem(it);
+    if(it.vidaUtil==null && it.categoria && CATEGORIAS[it.categoria] && CATEGORIAS[it.categoria].vidaUtil) it.vidaUtil = 100;
+    return it;
+  });
+}
+/* Quita Marca/Modelo conservando la medida y el código que estaban dentro de "modelo" */
+function limpiarItem(it){
+  if(it.categoria==='insertos') it.categoria='fresadora';
+  // Tornillos ahora viven en Refacciones / Tornillería
+  if(it.categoria==='tornillos_insertos') it.categoria='refacciones';
+  if(it.tipoTornillo){
+    const mt={'Para inserto':'Tornillo para inserto','Para piña':'Tornillo para piña','Para kyocera':'Tornillo para kyocera','Para corona':'Tornillo para corona'};
+    it.tipoRefaccion=mt[it.tipoTornillo]||it.tipoTornillo; delete it.tipoTornillo;
+  }
+  if(it.tipoPresna==='Chuck') it.tipoPresna='Chuck / Plato de sujeción';
+  if(it.tipoDesarmador==='Phillips') it.tipoDesarmador='Cruz (Phillips)';
+  if(it.tipoDesarmador==='Hexagonal') it.tipoDesarmador='Hexagonal (Allen)';
+  const mo=String(it.modelo||'');
+  if(mo){
+    const md=getMedida(it);
+    const mm=mo.match(/\d+\/\d+"?|\d+(?:\.\d+)?\s*mm/i);
+    if(!(md&&md.display)&&mm) it.diametro=parseMedida(mm[0]);
+    if(!it.codigo&&(it.categoria==='fresadora'||it.categoria==='torno')) it.codigo=mo;
+    if(it.categoria==='cortadores'&&!it.tipoHerramienta&&/bola/i.test(mo)) it.tipoHerramienta='Bola';
+  }
+  delete it.marca; delete it.modelo; delete it.marca_maquina;
+  return it;
+}
+async function persistInv(){ await storeSet('inventario3', INVENTARIO); }
+async function persistBajas(){ await storeSet('bajas', BAJAS); }
+async function persistMinimos(){ await storeSet('minimos', MINIMOS); }
+
+function genId(prefix){ return (prefix||'i')+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+/* =========================================================================
+   HELPERS DE MEDIDA / NOMBRE
+   ========================================================================= */
+function getMedida(it){ return it.diametro||it.medida||null; }
+function deriveSizeLabel(it){
+  const med=getMedida(it);
+  if(med&&med.display&&med.display.trim()) return med.display.trim();
+  const text=(it.articulo||'').trim();
+  let m=text.match(/(\d+\/\d+)\s*"?/);
+  if(m) return m[1]+'"';
+  m=text.match(/(\d+(?:\.\d+)?)\s*mm/i);
+  if(m) return m[1]+' mm';
+  return 'Sin medida';
+}
+function deriveSizeSort(it){
+  const med=getMedida(it);
+  if(med&&typeof med.decimal==='number'&&med.decimal!==null) return med.decimal;
+  const d=parseMedida(deriveSizeLabel(it)).decimal;
+  return d!=null?d:9999;
+}
+function mmFromLabel(label){
+  const p=parseMedida(label||''); return p.mm;
+}
+function deriveMM(it){
+  const med=getMedida(it);
+  if(med&&typeof med.mm==='number'&&med.mm!==null) return +med.mm.toFixed(3);
+  return mmFromLabel(deriveSizeLabel(it));
+}
+function formatSizeLabel(label){
+  if(!label||label==='Sin medida') return label;
+  if(/\d+\/\d+/.test(label)||/^\d*\.?\d+\s*"$/.test(label)){
+    const mm=mmFromLabel(label);
+    return mm!==null?`${label} (${mm} mm)`:label;
+  }
+  return label;
+}
+function deriveTipo(it){
+  if(it.tipoHerramienta) return it.tipoHerramienta;
+  const text=((it.articulo||'')+' '+(it.notas||'')).toLowerCase();
+  if(it.categoria==='cortadores'){
+    return text.includes('bola')?'Bola':'Plano';
+  }
+  return null;
+}
+function sumCantidad(arr){ return arr.reduce((s,i)=>s+(Number(i.cantidad)||0),0); }
+function escHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escAttr(s){ return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+
+function catCfg(cat){ return CATEGORIAS[cat]||{label:cat,icon:'▢',grupo:'Otros',sizeGrouped:false,addFields:[]}; }
+function isSizeGrouped(cat){ return !!catCfg(cat).sizeGrouped; }
+function isTipoGrouped(cat){ return !!catCfg(cat).tipoGrouped; }
+function hasVidaUtil(cat){ return true; } // Vida útil (%) disponible en todos los ítems
+
+function groupKey(categoria,tipo,sizeLabel){ return [categoria,tipo||'',sizeLabel].join('::'); }
+
+/* =========================================================================
+   TOAST
+   ========================================================================= */
+let _toastT;
+function toast(msg,err){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.toggle('err',!!err); el.classList.add('show');
+  clearTimeout(_toastT); _toastT=setTimeout(()=>el.classList.remove('show'),2600);
+}
+
+/* =========================================================================
+   NAVEGACIÓN
+   ========================================================================= */
+function goHome(){ Object.assign(state,{view:'home',categoria:null,tipo:null,sizeKey:null,editId:null}); render(); }
+function goCategoria(cat){ Object.assign(state,{view:'categoria',categoria:cat,tipo:null,sizeKey:null}); render(); }
+function goTipo(tipo){ state.view='tipo'; state.tipo=tipo; state.sizeKey=null; render(); }
+function goSize(sizeLabel){ state.view='size'; state.sizeKey=sizeLabel; render(); }
+function goSettings(){ state.view='settings'; render(); }
+function goBajas(){ state.view='bajas'; render(); }
+function goEquivalencias(){ state.view='equivalencias'; render(); }
+function goAlertas(){ state.view='alertas'; render(); }
+function goAlmacen(){ Object.assign(state,{view:'almacen',categoria:null,tipo:null,sizeKey:null}); render(); }
+function toggleInsertos(){ state.insOpen=!state.insOpen; render(); }
+function toggleMordazas(){ state.mordOpen=!state.mordOpen; render(); }
+window.toggleMordazas=toggleMordazas;
+const MORDAZAS_CATS=['mordazas_fresadora','mordazas_torno'];
+function mordazasCard(low,lowVU){
+  const items=INVENTARIO.filter(i=>MORDAZAS_CATS.includes(i.categoria));
+  const flag=low.some(g=>MORDAZAS_CATS.includes(g.categoria))||lowVU.some(i=>MORDAZAS_CATS.includes(i.categoria));
+  const open=!!state.mordOpen;
+  return `<button class="folder-card ins-main ${open?'open':''} ${flag?'low':''}" onclick="toggleMordazas()">
+    ${flag?'<span class="flag"></span>':''}
+    <span class="ficon">⊞</span><span class="fname">Mordazas <span class="ins-caret">${open?'▴':'▾'}</span></span>
+    <span class="fcount"><b>${sumCantidad(items)}</b> pzas · ${items.length} ref.</span></button>`;
+}
+function mordazasSub(){
+  const sub=MORDAZAS_CATS.map(cat=>{ const it2=INVENTARIO.filter(i=>i.categoria===cat);
+    return `<button class="folder-card cat-${cat}" onclick="goCategoria('${cat}')">
+      <span class="ficon">${catCfg(cat).icon}</span><span class="fname">${escHtml(catCfg(cat).label)}</span>
+      <span class="fcount"><b>${sumCantidad(it2)}</b> pzas · ${it2.length} ref.</span></button>`; }).join('');
+  return `<div class="ins-sub folder-grid">${sub}</div>`;
+}
+window.goAlmacen=goAlmacen; window.toggleInsertos=toggleInsertos;
+function goToGroup(cat,tipo,size){ Object.assign(state,{view:'size',categoria:cat,tipo:tipo||null,sizeKey:size}); render(); }
+
+window.goHome=goHome; window.goCategoria=goCategoria; window.goTipo=goTipo; window.goSize=goSize;
+window.goSettings=goSettings; window.goBajas=goBajas; window.goEquivalencias=goEquivalencias;
+window.goAlertas=goAlertas; window.goToGroup=goToGroup;
+
+document.querySelectorAll('.navbtn').forEach(b=>b.addEventListener('click',()=>{
+  const n=b.dataset.nav;
+  ({home:goHome,almacen:goAlmacen,settings:goSettings,bajas:goBajas,equivalencias:goEquivalencias,alertas:goAlertas}[n]||goHome)();
+}));
+
+function updateNavActive(){
+  const cur=['home','categoria','tipo','size'].includes(state.view)?'home':state.view;
+  document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active',b.dataset.nav===cur));
+}
+function renderBreadcrumb(){
+  const el=document.getElementById('breadcrumb');
+  if(state.searchQuery){
+    el.innerHTML=`<span class="crumb" onclick="clearGlobalSearch()">Inicio</span><span class="sep">›</span><span class="crumb current">Buscando: "${escHtml(state.searchQuery)}"</span>`;
+    return;
+  }
+  const STATIC={almacen:'En Almacén',settings:'Ajustes',bajas:'Bajas',equivalencias:'Equivalencias',alertas:'Alertas'};
+  if(STATIC[state.view]){ el.innerHTML=crumbHtml([{label:'Inicio',i:0},{label:STATIC[state.view],cur:true}]); return; }
+  if(state.view==='home'){ el.innerHTML=''; return; }
+  const trail=[{label:'Inicio',i:0}];
+  if(state.categoria) trail.push({label:catCfg(state.categoria).label,i:1,cur:state.view==='categoria'});
+  if(state.tipo) trail.push({label:state.tipo,i:2,cur:state.view==='tipo'});
+  if(state.sizeKey) trail.push({label:formatSizeLabel(state.sizeKey),i:3,cur:state.view==='size'});
+  el.innerHTML=crumbHtml(trail);
+}
+function crumbHtml(trail){
+  return trail.map((t,idx)=>{
+    const sep=idx>0?'<span class="sep">›</span>':'';
+    const cls=t.cur?'crumb current':'crumb';
+    const attr=t.cur?'':`onclick="__cn(${t.i})"`;
+    return sep+`<span class="${cls}" ${attr}>${escHtml(t.label)}</span>`;
+  }).join('');
+}
+function __cn(i){
+  if(i===0){goHome();return;}
+  if(i===1&&state.categoria){goCategoria(state.categoria);return;}
+  if(i===2&&state.tipo){goTipo(state.tipo);return;}
+}
+window.__cn=__cn;
+/* =========================================================================
+   RENDER PRINCIPAL
+   ========================================================================= */
+function render(){
+  updateNavActive();
+  renderBreadcrumb();
+  const app=document.getElementById('app');
+  if(state.searchQuery){ app.innerHTML=renderSearchResults(); return; }
+  ({
+    home:renderHome, categoria:renderCategoria, tipo:renderTipo,
+    size:renderSize, settings:renderSettings, bajas:renderBajas,
+    equivalencias:renderEquivalencias, alertas:renderAlertas
+  }[state.view]||renderHome)().then?null:app.innerHTML=({
+    home:renderHome, categoria:renderCategoria, tipo:renderTipo,
+    size:renderSize, settings:renderSettings, bajas:renderBajas,
+    equivalencias:renderEquivalencias, alertas:renderAlertas
+  }[state.view]||renderHome)();
+}
+// render sin async
+function render(){
+  updateNavActive();
+  renderBreadcrumb();
+  const app=document.getElementById('app');
+  if(state.searchQuery){ app.innerHTML=renderSearchResults(); return; }
+  const fn={home:renderHome,categoria:renderCategoria,tipo:renderTipo,
+    size:renderSize,settings:renderSettings,bajas:renderBajas,
+    equivalencias:renderEquivalencias,alertas:renderAlertas,almacen:renderAlmacen}[state.view]||renderHome;
+  app.innerHTML=fn();
+}
+
+/* =========================================================================
+   ALERTAS DE STOCK
+   ========================================================================= */
+function computeGroupTotals(){
+  const groups={};
+  INVENTARIO.forEach(it=>{
+    if(!isSizeGrouped(it.categoria)) return;
+    const label=deriveSizeLabel(it);
+    const tipo=isTipoGrouped(it.categoria)?deriveTipo(it):null;
+    const key=groupKey(it.categoria,tipo,label);
+    if(!groups[key]) groups[key]={categoria:it.categoria,tipo,sizeLabel:label,total:0,key};
+    groups[key].total+=Number(it.cantidad)||0;
+  });
+  Object.values(groups).forEach(g=>{ g.min=MINIMOS[g.key]??null; });
+  return groups;
+}
+function lowStockGroups(){ return Object.values(computeGroupTotals()).filter(g=>g.min!==null&&g.total<g.min); }
+function lowVidaUtil(){ return INVENTARIO.filter(it=>hasVidaUtil(it.categoria)&&it.vidaUtil!==undefined&&it.vidaUtil!==null&&it.vidaUtil<=20); }
+
+/* =========================================================================
+   HOME — agrupado por grupo de categorías
+   ========================================================================= */
+function renderHome(){
+  const low=lowStockGroups();
+  const lowVU=lowVidaUtil();
+  let alertHtml='';
+  if(low.length||lowVU.length){
+    const stockItems=low.map(g=>`<div class="alert-row">
+        <span class="name">${escHtml(catCfg(g.categoria).label+(g.tipo?' · '+g.tipo:'')+' · '+g.sizeLabel)}</span>
+        <span class="stat">${g.total} / mín.${g.min}
+          <button class="btn btn-sm btn-danger" onclick="goToGroup('${g.categoria}',${g.tipo?`'${escAttr(g.tipo)}'`:'null'},'${escAttr(g.sizeLabel)}')">Ver</button>
+        </span></div>`).join('');
+    const vuItems=lowVU.map(it=>`<div class="alert-row">
+        <span class="name">${escHtml(it.articulo||it.categoria)}</span>
+        <span class="stat vu-crit">${it.vidaUtil}% vida útil</span></div>`).join('');
+    alertHtml=`<div class="alert-panel">
+      <div class="alert-panel-head">⚠ Atención — ${low.length?`${low.length} bajo mínimo`:''} ${low.length&&lowVU.length?'·':''} ${lowVU.length?`${lowVU.length} herramienta(s) crítica(s) de vida útil`:''}</div>
+      ${stockItems}${vuItems}</div>`;
+  }
+
+  // Agrupar categorías por grupo
+  const grupos={};
+  GRUPO_ORDER.forEach(g=>grupos[g]=[]);
+  Object.entries(CATEGORIAS).forEach(([k,v])=>{
+    const g=v.grupo||'Otros';
+    if(!grupos[g]) grupos[g]=[];
+    grupos[g].push(k);
+  });
+
+  const totalPiezas=sumCantidad(INVENTARIO);
+  const gruposHtml=GRUPO_ORDER.map(grupoName=>{
+    const cats=grupos[grupoName]||[];
+    if(grupoName==='Insertos'){
+      const all=INVENTARIO.filter(i=>cats.includes(i.categoria)); const open=!!state.insOpen;
+      const sub=cats.map(cat=>{ const it2=INVENTARIO.filter(i=>i.categoria===cat);
+        return `<button class="folder-card cat-${cat}" onclick="goCategoria('${cat}')">
+          <span class="ficon">📄</span><span class="fname">${escHtml(catCfg(cat).label)}</span>
+          <span class="fcount"><b>${sumCantidad(it2)}</b> pzas · ${it2.length} ref.</span></button>`; }).join('');
+      return `<div class="home-group"><div class="folder-grid">
+        <button class="folder-card ins-main ${open?'open':''}" onclick="toggleInsertos()">
+          <span class="ficon">◆</span><span class="fname">Insertos <span class="ins-caret">${open?'▴':'▾'}</span></span>
+          <span class="fcount"><b>${sumCantidad(all)}</b> pzas · ${all.length} ref.</span></button></div>
+        ${open?`<div class="ins-sub folder-grid">${sub}</div>`:''}</div>`;
+    }
+    const cards=cats.map(cat=>{
+      if(cat==='mordazas_torno') return '';
+      if(cat==='mordazas_fresadora') return mordazasCard(low,lowVU);
+      const items=INVENTARIO.filter(i=>i.categoria===cat);
+      const total=sumCantidad(items);
+      const cfg=catCfg(cat);
+      const lowCount=low.filter(g=>g.categoria===cat).length;
+      const lowVUCount=lowVU.filter(i=>i.categoria===cat).length;
+      return `<button class="folder-card cat-${cat} ${lowCount||lowVUCount?'low':''}" onclick="goCategoria('${cat}')">
+        ${(lowCount||lowVUCount)?'<span class="flag"></span>':''}
+        <span class="ficon">${cfg.icon||'▢'}</span>
+        <span class="fname">${escHtml(cfg.label)}</span>
+        <span class="fcount"><b>${total}</b> pzas · ${items.length} ref.</span>
+      </button>`;
+    }).join('');
+    return `<div class="home-group">
+      <div class="home-group-label">${escHtml(grupoName)}</div>
+      <div class="folder-grid">${cards}</div>
+      ${grupoName==='Mordazas y prensas'&&state.mordOpen?mordazasSub():''}
+    </div>`;
+  }).join('');
+
+  return `<div class="section-head">
+      <h2 class="section-title">Inventario AGSA</h2>
+      <span class="section-meta">${INVENTARIO.length} referencias · ${totalPiezas} piezas</span>
+    </div>
+    ${alertHtml}
+    ${gruposHtml}
+    <div class="section-head" style="margin-top:26px;">
+      <h3 class="section-title" style="font-size:18px;">Documentos</h3>
+      <div class="section-actions">
+        <button class="btn" onclick="openAddItemModal()">+ Agregar</button>
+        <button class="btn" onclick="openImportModal()">Importar Excel</button>
+        <button class="btn btn-teal" onclick="openExportModal('inventario')">⬇ Inventario</button>
+        <button class="btn btn-teal" onclick="openExportModal('bajas')">⬇ Bajas</button>
+      </div>
+    </div>`;
+}
+/* =========================================================================
+   VISTAS DE CARPETA (categoría → tipo → tamaño → lista)
+   ========================================================================= */
+function renderCategoria(){
+  const cat=state.categoria; const cfg=catCfg(cat);
+  const items=INVENTARIO.filter(i=>i.categoria===cat);
+  const head=`<div class="section-head">
+    <h2 class="section-title">${cfg.icon} ${escHtml(cfg.label)}</h2>
+    <span class="section-meta">${sumCantidad(items)} pzas · ${items.length} ref.</span>
+  </div>`;
+  const addBtn=`<div class="section-actions" style="margin-bottom:14px;">
+    <button class="btn" onclick="openAddItemModal('${cat}')">+ Agregar a ${escHtml(cfg.label)}</button>
+  </div>`;
+  if(!items.length) return head+addBtn+emptyState('Sin herramientas aquí todavía.');
+
+  if(isTipoGrouped(cat)){
+    const tipos={};
+    items.forEach(it=>{ const t=deriveTipo(it)||'Otro'; (tipos[t]=tipos[t]||[]).push(it); });
+    const TIPO_ICONS={'Bola':'●','Plano':'▬','Plana':'▬'};
+    const cards=Object.entries(tipos).map(([t,arr])=>`
+      <button class="folder-card" onclick="goTipo('${escAttr(t)}')">
+        <span class="ficon" style="color:var(--teal)">${TIPO_ICONS[t]||'◇'}</span>
+        <span class="fname">${escHtml(t)}</span>
+        <span class="fcount"><b>${sumCantidad(arr)}</b> pzas · ${arr.length} ref.</span>
+      </button>`).join('');
+    return head+addBtn+`<div class="folder-grid">${cards}</div>`;
+  }
+  if(isSizeGrouped(cat)){
+    return head+addBtn+renderSizeFolders(items,cat,null);
+  }
+  return head+addBtn+renderItemList(items);
+}
+
+function renderTipo(){
+  const cat=state.categoria; const tipo=state.tipo; const cfg=catCfg(cat);
+  const items=INVENTARIO.filter(i=>i.categoria===cat&&deriveTipo(i)===tipo);
+  const head=`<div class="section-head">
+    <h2 class="section-title">${cfg.icon} ${escHtml(cfg.label)} · ${escHtml(tipo)}</h2>
+    <span class="section-meta">${sumCantidad(items)} pzas · ${items.length} ref.</span>
+  </div>`;
+  if(isSizeGrouped(cat)) return head+renderSizeFolders(items,cat,tipo);
+  return head+renderItemList(items);
+}
+
+function renderSizeFolders(items,cat,tipo){
+  const low=lowStockGroups().filter(g=>g.categoria===cat&&(tipo===null||g.tipo===tipo)).map(g=>g.sizeLabel);
+  const groups={};
+  items.forEach(it=>{
+    const l=deriveSizeLabel(it);
+    (groups[l]=groups[l]||{label:l,sortVal:deriveSizeSort(it),items:[]}).items.push(it);
+  });
+  const cards=Object.values(groups).sort((a,b)=>a.sortVal-b.sortVal).map(g=>{
+    const t=sumCantidad(g.items); const isLow=low.includes(g.label);
+    return `<button class="folder-card ${isLow?'low':''}" onclick="goSize('${escAttr(g.label)}')">
+      ${isLow?'<span class="flag"></span>':''}
+      <span class="ficon">◆</span>
+      <span class="fname">${escHtml(formatSizeLabel(g.label))}</span>
+      <span class="fcount"><b>${t}</b> pzas · ${g.items.length} ref.</span>
+    </button>`;
+  }).join('');
+  return `<div class="folder-grid">${cards}</div>`;
+}
+
+function renderSize(){
+  const cat=state.categoria; const tipo=state.tipo; const cfg=catCfg(cat);
+  let items=INVENTARIO.filter(i=>i.categoria===cat&&deriveSizeLabel(i)===state.sizeKey);
+  if(tipo) items=items.filter(i=>deriveTipo(i)===tipo);
+  const key=groupKey(cat,isTipoGrouped(cat)?tipo:null,state.sizeKey);
+  const min=MINIMOS[key];
+  const total=sumCantidad(items);
+  const titleTipo=tipo?' · '+tipo:'';
+  const head=`<div class="section-head">
+    <h2 class="section-title">${escHtml(cfg.label+titleTipo+' · '+formatSizeLabel(state.sizeKey))}</h2>
+    <span class="section-meta">${total} pzas${min!=null?' · mín. '+min:''}</span>
+  </div>`;
+  return head+renderItemList(items);
+}
+
+/* =========================================================================
+   LISTA DE ÍTEMS
+   ========================================================================= */
+function emptyState(msg){ return `<div class="empty-state"><div class="ei">▢</div><p>${escHtml(msg)}</p></div>`; }
+
+function vidaUtilBadge(vu){
+  if(vu===undefined||vu===null) return '';
+  const pct=Number(vu);
+  let cls='vu-ok'; if(pct<=20) cls='vu-crit'; else if(pct<=50) cls='vu-warn';
+  const used=100-pct;
+  return `<div class="vu-bar-wrap" title="Vida útil: ${pct}%">
+    <div class="vu-bar"><div class="vu-fill ${cls}" style="width:${pct}%"></div></div>
+    <span class="vu-label ${cls}">${pct}% vida útil</span>
+  </div>`;
+}
+
+function detallesItem(it){
+  const d=[];
+  if(it.codigo) d.push(it.codigo);
+  if(it.grado) d.push('Grado '+it.grado);
+  if(it.materialTrabajo) d.push(it.materialTrabajo);
+  if(it.tipoMachuelo) d.push(it.tipoMachuelo);
+  if(it.tipoPerfil) d.push(it.tipoPerfil);
+  if(it.angulo) d.push('Ángulo: '+String(it.angulo).replace(/°/g,'')+'°');
+  if(it.diametroZanco) d.push('Zanco: '+it.diametroZanco+' mm');
+  if(it.numFilos) d.push('Filos: '+it.numFilos);
+  if(it.tipoMaquina) d.push(it.tipoMaquina);
+  if(it.husillo) d.push(it.husillo);
+  if(it.ejes) d.push(it.ejes);
+  if(it.unidad) d.push(it.unidad);
+  [it.paso&&'Paso: '+it.paso,it.tipoBoquilla,it.tipoCono,it.tipoInserto,it.tipoDesarmador,it.tipoLima,it.tipoTornillo,
+   it.tipoPresna,it.nSerie&&'S/N: '+it.nSerie,it.alcance&&'Alcance: '+it.alcance+' mm',it.resolucion&&'Res. '+it.resolucion+' mm',
+   it.capMem||it.capacidad,it.espesor&&'Esp. '+it.espesor,
+   it.tipoLlave,it.tipoMordaza,it.tipoPerica,it.tipoRefaccion,
+   it.descripcion&&'Desc.: '+it.descripcion,it.alcanceFlex&&'Alcance: '+it.alcanceFlex+' m'].forEach(e=>{ if(e) d.push(e); });
+  return d;
+}
+function esAlmacen(it){ return String(it.ubicacion||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase().startsWith('almacen'); }
+function renderAlmacen(){
+  const items=INVENTARIO.filter(esAlmacen);
+  const cats=[...new Set(items.map(i=>i.categoria))].sort((x,y)=>catCfg(x).label.localeCompare(catCfg(y).label,'es'));
+  const head=`<div class="section-head"><h2 class="section-title">📦 En Almacén</h2>
+    <span class="section-meta">${items.length} referencias · ${sumCantidad(items)} pzas</span></div>`;
+  if(!items.length) return head+emptyState('No hay ítems con ubicación "Almacén". Asigna la ubicación al agregar o editar una herramienta.');
+  return head+cats.map(c=>{ const arr=items.filter(i=>i.categoria===c);
+    return `<div class="settings-group"><h4>${escHtml(catCfg(c).icon+' '+catCfg(c).label)} · ${sumCantidad(arr)} pzas</h4>${renderItemList(arr)}</div>`; }).join('');
+}
+function renderItemList(items){
+  if(!items.length) return emptyState('Sin referencias aquí todavía.');
+  const lowSet=new Set(lowStockGroups().map(g=>g.key));
+  return `<div class="item-list">${items.map(it=>{
+    const cfg=catCfg(it.categoria);
+    const tipoGroup=isTipoGrouped(it.categoria)?deriveTipo(it):null;
+    const gKey=groupKey(it.categoria,tipoGroup,deriveSizeLabel(it));
+    const isLow=lowSet.has(gKey);
+    const subParts=detallesItem(it);
+    if(it.piezasEmpaque) subParts.push(cfg.empLabel?cfg.empLabel+': '+it.piezasEmpaque+' pz':'Emp: '+it.piezasEmpaque);
+    if(it.categoria==='limas_joyero'&&it.piezasEmpaque!=null&&it.piezasEmpaque!==''){
+      const fal=Number(it.piezasEmpaque)-(Number(it.cantidad)||0);
+      subParts.push(fal>0?fal+' pz faltantes':'Paquete completo');
+    }
+    if(it.categoria==='puntas_indicador'){
+      const _m=deriveSizeLabel(it);
+      if(_m!=='Sin medida'&&!String(it.articulo||'').includes(_m)) subParts.unshift('Medida: '+formatSizeLabel(_m));
+    }
+    if(it.ubicacion) subParts.push('📍 '+it.ubicacion);
+
+    return `<div class="item-row ${isLow?'item-low':''}">
+      <div class="item-main">
+        <div class="item-title">${escHtml(it.articulo||cfg.label)}</div>
+        ${subParts.length?`<div class="item-sub">${escHtml(subParts.join(' · '))}</div>`:''}
+        ${hasVidaUtil(it.categoria)&&it.vidaUtil!=null?vidaUtilBadge(it.vidaUtil):''}
+      </div>
+      <div class="item-stats">
+        ${it.largoFilo!=null?`<div class="stat-box"><span class="sl">Largo filo</span><span class="sv">${it.largoFilo} mm</span></div>`:''}
+        ${it.longitudTotal!=null?`<div class="stat-box"><span class="sl">Longitud</span><span class="sv">${it.longitudTotal} mm</span></div>`:''}
+        <div class="stat-box"><span class="sl">${it.unidad?escHtml(it.unidad)+' en existencia':(cfg.qtyLabel||'Pz existencia')}</span><span class="sv qtybig${isLow?' low':''}">${it.cantidad??0}</span></div>
+      </div>
+      <div class="item-actions">
+        <button class="icon-btn" title="Editar" onclick="openEditModal('${it.id}')">✎</button>
+        <button class="icon-btn" title="Dar de baja" onclick="openBajaModal('${it.id}')">−</button>
+        <button class="icon-btn" title="Eliminar" onclick="openDeleteModal('${it.id}')">✕</button>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+/* =========================================================================
+   MODALES BASE
+   ========================================================================= */
+function openModal(html){
+  document.getElementById('modalRoot').innerHTML=`<div class="modal-overlay" id="__ov">${html}</div>`;
+  document.getElementById('__ov').addEventListener('click',e=>{ if(e.target.id==='__ov') closeModal(); });
+}
+function closeModal(){ document.getElementById('modalRoot').innerHTML=''; }
+window.closeModal=closeModal;
+
+/* -------- Editar cantidad y vida útil -------- */
+function openEditQtyModal(id){
+  const it=INVENTARIO.find(i=>i.id===id); if(!it) return;
+  openModal(`<div class="modal">
+    <h3>Ajustar cantidad</h3>
+    <p class="hint">${escHtml(it.articulo||'')}</p>
+    <div class="field"><label>Cantidad en existencia</label><input type="number" id="qtyInput" value="${it.cantidad??0}" min="0"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitEditQty('${id}')">Guardar</button>
+    </div></div>`);
+}
+async function submitEditQty(id){
+  const it=INVENTARIO.find(i=>i.id===id);
+  const val=Number(document.getElementById('qtyInput').value);
+  if(isNaN(val)||val<0){ toast('Cantidad inválida',true); return; }
+  it.cantidad=val; await persistInv(); closeModal(); render(); toast('Cantidad actualizada');
+}
+window.openEditQtyModal=openEditQtyModal; window.submitEditQty=submitEditQty;
+
+
+
+/* -------- Dar de baja -------- */
+function openBajaModal(id){
+  const it=INVENTARIO.find(i=>i.id===id); if(!it) return;
+  openModal(`<div class="modal">
+    <h3>Dar de baja</h3>
+    <p class="hint">${escHtml(it.articulo||'')} · Disponible: ${it.cantidad}</p>
+    <div class="field"><label>Cantidad a dar de baja</label><input type="number" id="bajaQty" value="1" min="1" max="${it.cantidad}"></div>
+    <div class="field"><label>Motivo</label>
+      <select id="bajaMotivo">
+        <option>Consumida / desgastada</option><option>Rota / dañada</option>
+        <option>Extraviada</option><option>Enviada a otra área</option><option>Otro</option>
+      </select></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-danger" onclick="submitBaja('${id}')">Dar de baja</button>
+    </div></div>`);
+}
+async function submitBaja(id){
+  const it=INVENTARIO.find(i=>i.id===id);
+  const qty=Number(document.getElementById('bajaQty').value);
+  const mot=document.getElementById('bajaMotivo').value;
+  if(isNaN(qty)||qty<1||qty>it.cantidad){ toast('Cantidad inválida',true); return; }
+  it.cantidad-=qty;
+  BAJAS.push({id:genId('b'),fecha:new Date().toISOString(),categoria:it.categoria,
+    articulo:it.articulo||'',medida:deriveSizeLabel(it),cantidad:qty,motivo:mot});
+  await persistInv(); await persistBajas(); closeModal(); render(); toast('Baja registrada');
+}
+window.openBajaModal=openBajaModal; window.submitBaja=submitBaja;
+
+/* -------- Eliminar -------- */
+function openDeleteModal(id){
+  const it=INVENTARIO.find(i=>i.id===id); if(!it) return;
+  openModal(`<div class="modal">
+    <h3>Eliminar referencia</h3>
+    <p class="hint">¿Seguro que deseas eliminar "${escHtml(it.articulo||'')}? Esto la quitará completamente del inventario.</p>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-danger" onclick="submitDelete('${id}')">Eliminar</button>
+    </div></div>`);
+}
+async function submitDelete(id){
+  const idx=INVENTARIO.findIndex(i=>i.id===id); if(idx===-1) return;
+  const it=INVENTARIO[idx];
+  if((it.cantidad??0)>0){
+    BAJAS.push({id:genId('b'),fecha:new Date().toISOString(),categoria:it.categoria,
+      articulo:it.articulo||'',medida:deriveSizeLabel(it),
+      cantidad:it.cantidad,motivo:'Referencia eliminada del inventario'});
+    await persistBajas();
+  }
+  INVENTARIO.splice(idx,1); await persistInv();
+  closeModal();
+  if(state.view==='size'&&!INVENTARIO.some(i=>i.categoria===state.categoria&&deriveSizeLabel(i)===state.sizeKey))
+    state.view=isTipoGrouped(state.categoria)?'tipo':'categoria';
+  render(); toast('Referencia eliminada');
+}
+window.openDeleteModal=openDeleteModal; window.submitDelete=submitDelete;
+/* =========================================================================
+   MODAL AGREGAR HERRAMIENTA — dinámico según categoría
+   ========================================================================= */
+const CAT_SINGULAR={
+  cortadores:'Cortador',brocas:'Broca',avellanadores:'Avellanador',machuelos:'Machuelo',
+  puntas_grabado:'Punta de grabado',cuchillas_tronzado:'Cuchilla de tronzado',
+  boquillas:'Boquilla',conos_fresadora:'Cono',extensiones_herramienta:'Extensión',
+  camisas_torno:'Camisa',portainsertos:'Porta inserto',holders_torno:'Holder',
+  barras_interiores:'Barra de interiores',mordazas_torno:'Mordaza',mordazas_fresadora:'Mordaza',
+  prensas:'Prensa',juego_paralelas:'Paralela',llaves_allen:'Llave Allen',
+  llaves_torx:'Llave Torx',llaves_nariz:'Llave nariz',llaves_espanola:'Llave española',
+  llaves_conos:'Llave conos',llaves_torno:'Llave torno',llaves_prensas:'Llave prensas',
+  desarmadores:'Desarmador',pericas:'Perico/Pinza',marro:'Marro',martillos:'Martillo',
+  limas_joyero:'Lima joyero',limas:'Lima',vernier:'Vernier',
+  indicador_caratula:'Indicador de carátula',base_magnetica:'Base magnética',
+  puntas_indicador:'Punta de indicador',flexometros:'Flexómetro',tornillos_insertos:'Tornillo',
+  maquinas_cnc:'Máquina CNC',computadoras:'Computadora',discos_duros:'Disco duro',
+  memorias_usb:'Memoria USB',extensiones_luz:'Extensión de luz',calculadoras:'Calculadora',
+  insertos:'Inserto',solubles:'Soluble',refacciones:'Refacción',
+  fresadora:'Inserto fresadora',torno:'Inserto torno',otros:'Herramienta'
+};
+Object.assign(CAT_SINGULAR,{
+  mangos_rebabiador:'Mango de desbarbador / rebabador',cuchillas_rebabiador:'Cuchilla de rebabiador',
+  portainsertos:'Portainserto',mordazas_torno:'Mordaza para torno',mordazas_fresadora:'Mordaza para fresadora',
+  llaves_conos:'Llave para conos',llaves_prensas:'Llave para prensa',desarmadores:'Desarmador',
+  pericas:'Pinzas / Pericas',martillos:'Martillo de goma',marro:'Marro',limas_joyero:'Limas de joyero',
+  juego_clan:'Juego de clamps',refacciones:'Refacción'
+});
+// Nombre asignado automáticamente (sin campo manual)
+const NOMBRE_FIJO={puntas_indicador:'Puntas de indicador',flexometros:'Flexómetro',solubles:'Soluble / Consumible'};
+// Campo de "tipo" que se agrega al nombre automático
+const TIPO_KEY={boquillas:'tipoBoquilla',conos_fresadora:'tipoCono',mordazas_torno:'tipoMordaza',mordazas_fresadora:'tipoMordaza',
+  prensas:'tipoPresna',llaves_conos:'tipoLlave',llaves_prensas:'tipoLlave',desarmadores:'tipoDesarmador',limas:'tipoLima'};
+// Medidas estándar en pulgadas (la opción "Otros" se agrega al final)
+const INCH_STD=['1/64"','1/32"','1/16"','3/32"','1/8"','5/32"','3/16"','7/32"','1/4"','9/32"','5/16"','11/32"','3/8"','13/32"','7/16"','15/32"','1/2"','9/16"','5/8"','11/16"','3/4"','13/16"','7/8"','15/16"','1"','1 1/4"','1 1/2"','2"'];
+
+/* =========================================================================
+   FORMULARIO DINÁMICO POR CATEGORÍA (alta y edición comparten la misma definición)
+   ========================================================================= */
+const UBIC_SUGERIDAS=['Almacén','Taller','Producción','Máquina'];
+const UNIDADES=['Litros','Galones','Cubetas','Tambores','Piezas'];
+const MATERIALES=['Acero','Inoxidable','Aluminio','Fundición','Titanio','Aleaciones de alta temperatura','Uso general'];
+const NO_SIZE=['computadoras','discos_duros','memorias_usb','calculadoras','extensiones_luz','otros'];
+const PERFIL_POR_CAT={
+  cortadores:'cortador',brocas:'cortador',avellanadores:'avellanador',machuelos:'machuelo',
+  solubles:'soluble',refacciones:'soluble',fresadora:'inserto',torno:'inserto',insertos:'inserto',
+  vernier:'instrumento',indicador_caratula:'instrumento',base_magnetica:'instrumento',
+  puntas_indicador:'instrumento',flexometros:'instrumento',maquinas_cnc:'maquina'
+};
+function perfilDe(cat){ return PERFIL_POR_CAT[cat]||(catCfg(cat).grupo==='Herramienta manual'?'manual':'generico'); }
+
+function parseMedida(s){
+  s=String(s==null?'':s).trim(); let decimal=null,mm=null,range=false,m;
+  if((m=s.match(/^(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)\s*mm$/i))){ mm=parseFloat(m[1]); decimal=mm/25.4; range=true; }   // rango de boquilla: 3-2 mm
+  else if((m=s.match(/^(\d+)\s+(\d+)\/(\d+)\s*(?:"|in)?$/i))){ decimal=parseInt(m[1])+parseInt(m[2])/parseInt(m[3]); mm=+(decimal*25.4).toFixed(3); } // 1 1/4"
+  else if((m=s.match(/(\d+)\/(\d+)/))){ decimal=parseInt(m[1])/parseInt(m[2]); mm=+(decimal*25.4).toFixed(3); }
+  else if((m=s.match(/(\d+(?:\.\d+)?)\s*mm/i))){ mm=parseFloat(m[1]); decimal=mm/25.4; }
+  else if((m=s.match(/^(\d*\.?\d+)\s*(?:"|in)$/i))){ decimal=parseFloat(m[1]); mm=+(decimal*25.4).toFixed(3); }   // 0.75"
+  else if((m=s.match(/^M\s*(\d+(?:\.\d+)?)/i))){ mm=parseFloat(m[1]); decimal=mm/25.4; }
+  return {display:s,decimal,mm,range};
+}
+/* Simbología automática: detecta la unidad y agrega ", / o mm según corresponda.
+   hint = pestaña activa ('in' | 'mm'). Una fracción o comillas fuerzan pulgadas; "mm" fuerza milímetros. */
+function normalizeMedida(raw,hint){
+  let s=String(raw==null?'':raw).trim().replace(/[”“″]/g,'"').replace(/,/g,'.');
+  if(!s) return '';
+  const rng=s.match(/^(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)\s*(mm)?$/i);
+  if(rng&&(rng[3]||hint==='mm')) return rng[1]+'-'+rng[2]+' mm';
+  const isMm=/mm\s*$/i.test(s);
+  const isIn=/"|\bin\b|pulg/i.test(s)||/\d\s*\/\s*\d/.test(s);
+  const unit=isMm?'mm':(isIn?'in':hint);
+  const core=s.replace(/mm|pulg\w*|\bin\b|"/ig,'').replace(/\s+/g,' ').trim();
+  if(!core) return '';
+  if(unit==='mm'){ const n=parseFloat(core); return isNaN(n)?s:n+' mm'; }
+  return core.replace(/\s*\/\s*/g,'/')+'"';
+}
+function fmtOtro(el,hint){ el.value=normalizeMedida(el.value,hint); onMedidaChange(); }
+
+/* Campos específicos por categoría según el documento de especificaciones.
+   Devuelve null si la categoría usa el formulario por perfil de siempre. */
+function camposEspecificos(cat,q,u){
+  const sel=(k,label,opts)=>({k:k,t:'sel',label:label,opts:opts,req:1});
+  switch(cat){
+    case 'mangos_rebabiador': case 'martillos': case 'marro':
+      return [q(),u];
+    case 'boquillas':
+      return [sel('tipoBoquilla','Tipo de boquilla',['R8','ER32','ER40','ER16','ISO','NT40','R32','Otro']),
+        {k:'diametro',t:'medida',label:'Medida de la boquilla',req:1,mmRange:true},
+        {k:'piezasEmpaque',t:'num',label:'Pzas por empaque',step:1},q(),u];
+    case 'conos_fresadora':
+      return [sel('tipoCono','Tipo de cono',['ER32','NT40','BT40','ISO30','R32','Otro']),q(),u];
+    case 'portainsertos':
+      return [{k:'descripcion',t:'text',label:'Descripción (detalles del portainserto)',ph:'Ej. Código, lado, tamaño…',req:1},q(),u];
+    case 'mordazas_torno': case 'mordazas_fresadora':
+      return [sel('tipoMordaza','Tipo / material',['Duras (metálicas)','Blandas (aluminio)']),q(),u];
+    case 'prensas':
+      return [sel('tipoPresna','Tipo de prensa',['Mecánica','Hidráulica','Chuck / Plato de sujeción']),q(),u];
+    case 'llaves_conos':
+      return [sel('tipoLlave','Tipo',['ER32','NT40']),q('Cantidad (PZ)'),u];
+    case 'llaves_prensas':
+      return [sel('tipoLlave','Tipo',['Hidráulicas','Mecánicas']),q('Cantidad de llaves'),u];
+    case 'desarmadores':
+      return [sel('tipoDesarmador','Tipo de punta',['Cruz (Phillips)','Plano','Torx','Hexagonal (Allen)']),q(),u];
+    case 'pericas':
+      return [sel('tipoPerica','Tipo',['Pericas','Pinzas']),q(),u];
+    case 'limas':
+      return [sel('tipoLima','Tipo de lima',['Media caña','Bastarda','Musa','Redonda','Plana']),q(),u];
+    case 'limas_joyero':
+      return [{k:'piezasEmpaque',t:'num',label:'Cantidad del paquete (pz totales)',step:1,req:1,h:1,ph:'Ej. 9'},
+        {k:'cantidad',t:'num',label:'Cantidad en existencia (pz)',step:1,h:1,ph:'Ej. 5'},
+        {t:'calc',k:'faltantes'},u];
+    case 'juego_clan':
+      return [{k:'piezasEmpaque',t:'num',label:'Cantidad de piezas por juego',step:1,req:1,h:1},
+        {k:'cantidad',t:'num',label:'Juegos en existencia',step:1,h:1,def:1},u];
+    case 'refacciones':
+      return [sel('tipoRefaccion','Tipo de refacción / tornillo',['Tornillo para inserto','Tornillo para piña','Tornillo para kyocera','Tornillo para corona','Otro']),q(),u];
+    case 'puntas_indicador':
+      return [{k:'diametro',t:'medida',label:'Medida de la punta',req:1},q(),u];
+    case 'flexometros':
+      return [{k:'alcanceFlex',t:'num',label:'Alcance (metros)',step:.1,req:1,ph:'Ej. 3, 5, 8'},q(),u];
+    case 'solubles':
+      return [{k:'unidad',t:'sel',label:'Unidad',opts:UNIDADES,req:1},q(),u];
+  }
+  return null;
+}
+
+/* Definición de campos por perfil.  t: text | num | sel | combo | ubic | medida | mtxt | vu | notas */
+function camposDe(cat,edit){
+  const cfg=catCfg(cat), p=perfilDe(cat);
+  const qty=(l)=>({k:'cantidad',t:'num',label:l||'Cantidad en existencia',def:1,h:1});
+  const ubi={k:'ubicacion',t:'ubic',label:'Ubicación',def:'Almacén',ph:'Ej. Almacén, Taller',h:1};
+  const vu={k:'vidaUtil',t:'vu',label:'Vida útil (%)',def:100};
+  const nombre=(l,ph,req)=>({k:'articulo',t:'text',label:l,ph:ph,req:req});
+  let c=camposEspecificos(cat,qty,ubi);
+  if(c){}
+  else if(p==='cortador') c=[
+    ...(isTipoGrouped(cat)?[{k:'tipoHerramienta',t:'sel',label:'Tipo',opts:['Plano','Bola'],req:1}]:[]),
+    {k:'diametro',t:'medida',label:'Diámetro / Medida (pulgadas o mm)',req:1},
+    {k:'largoFilo',t:'num',label:'Largo de filo (mm)',step:.1,h:1},{k:'longitudTotal',t:'num',label:'Longitud total (mm)',step:.1,h:1},
+    {k:'numFilos',t:'num',label:'Número de filos',step:1},
+    vu,qty(),ubi];
+  else if(p==='avellanador') c=[
+    {k:'angulo',t:'num',label:'Ángulo de avellanado (°)',list:['60','82','90','120'],ph:'60, 82, 90, 120',req:1},
+    {k:'diametro',t:'medida',label:'Diámetro mayor (fracción o mm)',req:1},
+    {k:'diametroZanco',t:'num',label:'Diámetro de zanco / menor (mm)',step:.01,h:1},
+    {k:'longitudTotal',t:'num',label:'Longitud total (mm)',step:.1,h:1},
+    {k:'numFilos',t:'text',label:'Número de filos / estriado',ph:'Ej. 3 filos, estriado recto'},
+    vu,qty(),ubi];
+  else if(p==='machuelo') c=[
+    {k:'diametro',t:'mtxt',label:'Medida de rosca y paso',ph:'Ej. M8x1.25, 1/4"-20 UNC, 1/8"-27 NPT',req:1},
+    {k:'tipoMachuelo',t:'sel',label:'Tipo de machuelo',opts:['Helicoidal / Flauta espiral','Recto / Salida recta','Semicónico / Entrada cónica']},
+    {k:'longitudTotal',t:'num',label:'Longitud total (mm)',step:.1},
+    vu,qty(),ubi];
+  else if(p==='soluble') c=[
+    nombre('Nombre del producto / insumo','Ej. Soluble semisintético, Aceite de corte',1),
+    {k:'unidad',t:'sel',label:'Unidad de medida',opts:UNIDADES,req:1},
+    qty(),ubi];
+  else if(p==='manual') c=[
+    {k:'diametro',t:(['llaves_allen','llaves_nariz','llaves_espanola'].includes(cat)?'medida':'mtxt'),label:'Medida / tamaño',ph:'Ej. T25, 10 mm, 1/2"',req:1},
+    {k:'tipoPerfil',t:'sel',label:'Tipo / perfil',opts:(cfg.tipos&&cfg.tipos.length?cfg.tipos:['Hexagonal','Torx','Plano','Phillips','Cuadrado','Otro'])},
+    qty('Cantidad (piezas o juegos)'),ubi];
+  else if(p==='inserto') c=[
+    {k:'codigo',t:'text',label:'Código / geometría del inserto',ph:'Ej. CNMG 120408, SP300',req:1},
+    {k:'grado',t:'text',label:'Grado / recubrimiento',ph:'Ej. PC9030, PR1210'},
+    {k:'materialTrabajo',t:'combo',label:'Material de trabajo recomendado',opts:MATERIALES},
+    {k:'piezasEmpaque',t:'num',label:'Piezas por empaque',step:1,h:1},qty('Cantidad de insertos'),ubi];
+  else if(p==='instrumento') c=[
+    nombre('Nombre / dispositivo','Ej. Vernier digital 6", Indicador de carátula',1),
+    qty(),ubi];
+  else if(p==='maquina') c=[
+    nombre('Nombre / identificador de la máquina','Ej. Torno CNC 01, Fresadora Vertical',1),
+    {k:'tipoMaquina',t:'sel',label:'Tipo de máquina',opts:['Torno','Fresadora','Otra'],req:1},
+    {k:'husillo',t:'sel',label:'Configuración de husillo',opts:['Husillo simple','Doble husillo'],showIf:{k:'tipoMaquina',v:'Torno'}},
+    {k:'ejes',t:'sel',label:'Número de ejes',opts:['3 ejes','4 ejes','5 ejes'],showIf:{k:'tipoMaquina',v:'Fresadora'}},
+    qty(),ubi];
+  else { // categorías sin perfil específico: formulario genérico sin marca/modelo
+    const ad=cfg.addFields||[];
+    c=[
+      NO_SIZE.includes(cat)?nombre('Nombre / descripción (opcional)','',0):{k:'diametro',t:'medida',label:'Medida',req:1},
+      ...(isTipoGrouped(cat)?[{k:'tipoHerramienta',t:'sel',label:'Tipo',opts:cfg.tipos,req:1}]:[]),
+      ...(cfg.extraFields||[]).map(f=>({k:f.id,t:f.isSelect?'sel':'text',label:f.label,opts:f.options,ph:f.placeholder})),
+      ...(ad.includes('filo')?[{k:'largoFilo',t:'num',label:'Largo de filo (mm)',step:.1,h:1}]:[]),
+      ...((ad.includes('filo')||ad.includes('longitud'))?[{k:'longitudTotal',t:'num',label:'Longitud total (mm)',step:.1,h:1}]:[]),
+      ...(ad.includes('empaque')?[{k:'piezasEmpaque',t:'num',label:'Pzas por empaque',step:1}]:[]),
+      ...(hasVidaUtil(cat)?[vu]:[]),
+      qty(),ubi];
+  }
+  if(edit&&!c.some(f=>f.k==='articulo')&&!NOMBRE_FIJO[cat]) c.unshift(nombre('Artículo / nombre','',0));
+  if(!c.some(f=>f.k==='vidaUtil')) c.push(vu);   // Vida útil (%) en todos los ítems
+  c.push({k:'notas',t:'notas',label:'Notas (opcional)'});
+  return c;
+}
+
+let CAMPOS_CAT=null;
+function valDe(it,f){
+  if(!it) return f.def!==undefined?f.def:'';
+  if(f.t==='medida'||f.t==='mtxt'){ const l=deriveSizeLabel(it); return l==='Sin medida'?'':l; }
+  if(f.k==='vidaUtil') return it.vidaUtil??100;
+  return it[f.k]??'';
+}
+function medidaWidget(f,it){
+  const cur=it?valDe(it,f):''; let mmMode=false,inSel='',inOtro='',mmVal='';
+  if(cur){
+    if(/mm\s*$/i.test(cur)){ mmMode=true; mmVal=cur.replace(/\s*mm\s*$/i,''); }
+    else { const n=normalizeMedida(cur,'in'); if(INCH_STD.includes(n)) inSel=n; else { inSel='Otros'; inOtro=n; } }
+  }
+  const ph=f.mmRange?'Rango: 3-2, 20-19 (o un valor: 5, 12.5)':'Ej. 5, 12.5, 0.35';
+  return `<div class="field"><label>${escHtml(f.label)} *</label>
+    <div class="medida-tabs">
+      <button type="button" class="medida-tab ${mmMode?'':'active'}" id="tabIn" onclick="selTab('in')">Pulgadas (in)</button>
+      <button type="button" class="medida-tab ${mmMode?'active':''}" id="tabMm" onclick="selTab('mm')">Milimétricas (mm)</button>
+    </div>
+    <div id="medidaIn" style="margin-top:8px;${mmMode?'display:none;':''}">
+      <select id="niMedidaIn" onchange="onMedidaSel()">
+        <option value="">— Selecciona —</option>
+        ${INCH_STD.map(o=>`<option value="${escHtml(o)}" ${o===inSel?'selected':''}>${escHtml(o)}</option>`).join('')}
+        <option value="Otros" ${inSel==='Otros'?'selected':''}>Otros…</option>
+      </select>
+      <input type="text" id="niMedidaInOtro" class="otro-input" style="${inSel==='Otros'?'':'display:none;'}" value="${escHtml(inOtro)}"
+        placeholder='Ej. 3/4, 1 1/4, 0.75 (se agrega el símbolo ")' oninput="onMedidaChange()" onblur="fmtOtro(this,'in')">
+    </div>
+    <div id="medidaMm" style="margin-top:8px;${mmMode?'':'display:none;'}">
+      <input type="text" id="niMedidaMm" value="${escHtml(mmVal)}" placeholder="${escHtml(ph)}" oninput="onMedidaChange()" onblur="fmtOtro(this,'mm')">
+    </div>
+    <div id="niConvBox" class="conversion-box" style="display:none;"></div></div>`;
+}
+function campoHtml(f,it){
+  const id='f_'+f.k, v=valDe(it,f), L=escHtml(f.label)+(f.req?' *':'');
+  let h='';
+  if(f.t==='medida') h=medidaWidget(f,it);
+  else if(f.t==='mtxt'||f.t==='text')
+    h=`<div class="field"><label>${L}</label><input id="${id}" value="${escHtml(v)}" placeholder="${escHtml(f.ph||(f.t==='medida'?'Ej. 1/8", 3.5 mm':''))}" oninput="onCampoChange()"></div>`;
+  else if(f.t==='num')
+    h=`<div class="field"><label>${L}</label><input type="number" id="${id}" value="${escHtml(v)}" min="0" step="${f.step||1}" placeholder="${escHtml(f.ph||'')}" ${f.list?`list="dl_${f.k}"`:''} oninput="onCampoChange()">
+      ${f.list?`<datalist id="dl_${f.k}">${f.list.map(o=>`<option value="${o}">`).join('')}</datalist>`:''}</div>`;
+  else if(f.t==='sel'){
+    const opts=f.opts.slice(); if(v&&!opts.includes(v)) opts.unshift(v);
+    const hayOtro=opts.some(o=>/^otros?$/i.test(o));
+    h=`<div class="field"><label>${L}</label><select id="${id}" onchange="onSelChange('${f.k}')">
+      ${f.req?'':'<option value="">— Selecciona —</option>'}
+      ${opts.map(o=>`<option value="${escHtml(o)}" ${o===v?'selected':''}>${escHtml(o)}</option>`).join('')}</select>
+      ${hayOtro?`<input type="text" id="${id}_otro" class="otro-input" style="display:none;" placeholder="Especifica…" oninput="onCampoChange()">`:''}</div>`;
+  }
+  else if(f.t==='combo')
+    h=`<div class="field"><label>${L}</label><input id="${id}" list="dl_${f.k}" value="${escHtml(v)}" placeholder="Selecciona o escribe">
+      <datalist id="dl_${f.k}">${f.opts.map(o=>`<option value="${escHtml(o)}">`).join('')}</datalist></div>`;
+  else if(f.t==='ubic')
+    h=`<div class="field"><label>${L}</label><input id="${id}" list="dlUbic" value="${escHtml(v)}" placeholder="${escHtml(f.ph||'')}"></div>`;
+  else if(f.t==='vu')
+    h=`<div class="field"><label>${L}</label><div class="vu-slider-wrap">
+      <input type="range" id="${id}" min="0" max="100" step="5" value="${v}" oninput="document.getElementById('f_vidaUtil_v').textContent=this.value+'%'">
+      <span id="f_vidaUtil_v" class="vu-pct-display">${v}%</span></div></div>`;
+  else if(f.t==='calc')
+    h=`<div class="field"><div id="calc_${f.k}" class="conversion-box" style="margin-top:0;"></div></div>`;
+  else if(f.t==='notas')
+    h=`<div class="field"><label>${L}</label><textarea id="${id}" rows="2">${escHtml(v)}</textarea></div>`;
+  return `<div id="w_${f.k}" class="fw">${h}</div>`;
+}
+function cuerpoCampos(cat,it){
+  CAMPOS_CAT=cat; const cs=camposDe(cat,!!it); let h='',i=0;
+  while(i<cs.length){
+    const f=cs[i],n=cs[i+1];
+    if(f.h&&n&&n.h){ h+=`<div class="field-row">${campoHtml(f,it)}${campoHtml(n,it)}</div>`; i+=2; }
+    else { h+=campoHtml(f,it); i++; }
+  }
+  return h+`<datalist id="dlUbic">${UBIC_SUGERIDAS.map(u=>`<option value="${u}">`).join('')}</datalist>
+    <div id="niNamePrev" class="name-preview" style="display:none;"></div>`;
+}
+function campoVisible(f){
+  if(!f.showIf) return true;
+  const el=document.getElementById('f_'+f.showIf.k); return !!el&&el.value===f.showIf.v;
+}
+function onCampoChange(){
+  camposDe(CAMPOS_CAT,false).forEach(f=>{
+    if(f.showIf){ const w=document.getElementById('w_'+f.k); if(w) w.style.display=campoVisible(f)?'':'none'; }
+  });
+  actualizarCalc();
+  actualizarPreview();
+}
+function onSelChange(k){
+  const sl=document.getElementById('f_'+k), o=document.getElementById('f_'+k+'_otro');
+  if(o&&sl){ const otros=/^otros?$/i.test(sl.value); o.style.display=otros?'':'none'; if(otros) o.focus(); }
+  onCampoChange();
+}
+/* Limas de joyero: piezas faltantes del paquete */
+function actualizarCalc(){
+  const b=document.getElementById('calc_faltantes'); if(!b) return;
+  const tEl=document.getElementById('f_piezasEmpaque'), eEl=document.getElementById('f_cantidad');
+  if(!tEl||tEl.value===''){ b.innerHTML='<span class="conv-label">Faltantes:</span> <strong>—</strong>'; return; }
+  const fal=Number(tEl.value)-(eEl&&eEl.value!==''?Number(eEl.value):0);
+  b.innerHTML=fal<0?'<strong style="color:var(--danger)">⚠ La existencia supera las piezas del paquete</strong>'
+    :`<span class="conv-label">Faltantes:</span> <strong>${fal} pz faltantes</strong>`;
+}
+function leerMedida(f,edit){
+  if(f.t==='mtxt'||!document.getElementById('tabIn')) return parseMedida((document.getElementById('f_'+f.k)||{value:''}).value);
+  if(document.getElementById('tabIn').classList.contains('active')){
+    const sv=document.getElementById('niMedidaIn').value;
+    return parseMedida(/^otros$/i.test(sv)?normalizeMedida(document.getElementById('niMedidaInOtro').value,'in'):sv);
+  }
+  return parseMedida(normalizeMedida(document.getElementById('niMedidaMm').value,'mm'));
+}
+function recolectar(cat,edit){
+  const out={}; let err=null;
+  camposDe(cat,edit).forEach(f=>{
+    if(!campoVisible(f)){ out[f.k]=undefined; return; }
+    if(f.t==='medida'||f.t==='mtxt'){
+      const m=leerMedida(f,edit); if(f.req&&!m.display&&!err) err='Falta: '+f.label; out.diametro=m; return;
+    }
+    const el=document.getElementById('f_'+f.k); if(!el) return;
+    let v=el.value.trim();
+    if(f.t==='sel'&&/^otros?$/i.test(v)){ const o=document.getElementById('f_'+f.k+'_otro'); v=o?o.value.trim():''; if(!v&&!err) err='Especifica: '+f.label; }
+    if(f.t==='num'||f.t==='vu'){ v=v===''?undefined:Number(v); if(f.k==='cantidad') v=v||0; }
+    if(f.req&&(v===''||v===undefined)&&!err) err='Falta: '+f.label;
+    out[f.k]=(v===''?undefined:v);
+  });
+  if(cat==='limas_joyero'&&!err&&out.piezasEmpaque!=null&&(out.cantidad||0)>out.piezasEmpaque) err='La existencia no puede ser mayor que las piezas del paquete';
+  return {out,err};
+}
+function nombreAuto(cat,r){
+  if(NOMBRE_FIJO[cat]) return NOMBRE_FIJO[cat];      // Puntas de indicador, Flexómetro, Soluble / Consumible
+  if(r.articulo) return r.articulo;
+  const p=perfilDe(cat), med=r.diametro&&r.diametro.display?r.diametro.display:'';
+  if(p==='inserto') return ['Inserto',r.codigo].filter(Boolean).join(' ');
+  if(cat==='refacciones') return r.tipoRefaccion||'Refacción';
+  if(cat==='pericas') return r.tipoPerica||'Pinzas / Pericas';
+  let base=(cat==='cortadores'&&r.tipoHerramienta)?'Cortador '+r.tipoHerramienta:(CAT_SINGULAR[cat]||catCfg(cat).label);
+  const tk=TIPO_KEY[cat]; if(tk&&r[tk]) base+=' · '+r[tk];
+  const conMM=r.diametro&&r.diametro.mm&&!r.diametro.range&&(/\d+\/\d+/.test(med)||/"$/.test(med));
+  const size=med?(conMM?`${med} (${r.diametro.mm} mm)`:med):'';
+  const ang=(p==='avellanador'&&r.angulo)?r.angulo+'°':'';
+  return [base,ang,size].filter(Boolean).join(' ');
+}
+function actualizarPreview(){
+  const catEl=document.getElementById('niCat'), pv=document.getElementById('niNamePrev'); if(!catEl||!pv) return;
+  const cat=catEl.value, {out}=recolectar(cat,false); const n=nombreAuto(cat,out);
+  const needsMed=camposDe(cat,false).some(f=>f.t==='medida'||f.t==='mtxt')||perfilDe(cat)==='inserto';
+  const hasMed=!!(out.diametro&&out.diametro.display)||!!out.codigo;
+  const ok=n&&!out.articulo&&(needsMed?hasMed:true);
+  pv.style.display=ok?'':'none';
+  if(ok) pv.innerHTML=`<span class="pv-label">Se guardará como:</span> <strong>${escHtml(n)}</strong>`;
+}
+function selTab(tab){
+  const isIn=tab==='in';
+  document.getElementById('tabIn').classList.toggle('active',isIn);
+  document.getElementById('tabMm').classList.toggle('active',!isIn);
+  document.getElementById('medidaIn').style.display=isIn?'':'none';
+  document.getElementById('medidaMm').style.display=isIn?'none':'';
+  onMedidaChange();
+  // Enfoque automático: directo al campo de escritura
+  if(isIn){ if(/^otros$/i.test(document.getElementById('niMedidaIn').value)) document.getElementById('niMedidaInOtro').focus(); }
+  else document.getElementById('niMedidaMm').focus();
+}
+function onMedidaSel(){
+  const sl=document.getElementById('niMedidaIn'), o=document.getElementById('niMedidaInOtro');
+  const otros=/^otros$/i.test(sl.value);
+  o.style.display=otros?'':'none'; if(otros) o.focus();
+  onMedidaChange();
+}
+function onMedidaChange(){
+  const tf=document.getElementById('tabIn'); if(!tf) return;
+  const conv=document.getElementById('niConvBox');
+  const m=leerMedida({t:'medida',k:'diametro'},false);
+  if(conv){
+    if(m.display&&m.mm!=null&&!m.range){
+      const esMm=/mm\s*$/i.test(m.display);
+      conv.style.display='';
+      conv.innerHTML=`<span class="conv-label">Equivalencia:</span> <strong>${escHtml(m.display)}${esMm?` ≈ ${m.decimal.toFixed(4)}" (${m.mm.toFixed(3)} mm)`:` = ${m.mm} mm`}</strong>`;
+    } else conv.style.display='none';
+  }
+  actualizarPreview();
+}
+
+/* -------- Agregar -------- */
+function openAddItemModal(precat){
+  precat=CATEGORIAS[precat]?precat:'cortadores';
+  const opts=GRUPO_ORDER.map(g=>{
+    const ks=CAT_ORDER.filter(k=>catCfg(k).grupo===g); if(!ks.length) return '';
+    return `<optgroup label="${escHtml(g)}">${ks.map(k=>`<option value="${k}" ${k===precat?'selected':''}>${escHtml(catCfg(k).label)}</option>`).join('')}</optgroup>`;
+  }).join('');
+  openModal(`<div class="modal">
+    <h3>Agregar herramienta</h3>
+    <div class="field"><label>Categoría</label><select id="niCat" onchange="onNiCatChange()">${opts}</select></div>
+    <div id="niCampos">${cuerpoCampos(precat,null)}</div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitAddItem()">Agregar</button>
+    </div></div>`);
+  onCampoChange();
+}
+function onNiCatChange(){
+  const cat=document.getElementById('niCat').value;
+  document.getElementById('niCampos').innerHTML=cuerpoCampos(cat,null);
+  onCampoChange();
+}
+async function submitAddItem(){
+  const cat=document.getElementById('niCat').value;
+  const {out,err}=recolectar(cat,false);
+  if(err){ toast(err,true); return; }
+  const articulo=nombreAuto(cat,out);
+  INVENTARIO.push({id:genId('itm'),categoria:cat,...out,articulo});
+  await persistInv(); closeModal(); render(); toast('Agregado: '+articulo);
+}
+
+/* -------- Editar -------- */
+function openEditModal(id){
+  const it=INVENTARIO.find(i=>i.id===id); if(!it) return;
+  openModal(`<div class="modal">
+    <h3>Editar herramienta</h3>
+    <p class="hint">${escHtml(catCfg(it.categoria).label)}</p>
+    ${cuerpoCampos(it.categoria,it)}
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitEdit('${id}')">Guardar cambios</button>
+    </div></div>`);
+  onCampoChange();
+}
+async function submitEdit(id){
+  const it=INVENTARIO.find(i=>i.id===id); if(!it) return;
+  const {out,err}=recolectar(it.categoria,true);
+  if(err){ toast(err,true); return; }
+  const previo=it.articulo;
+  const eraAuto=previo===nombreAuto(it.categoria,{...it,articulo:undefined});   // nombre generado automáticamente
+  Object.keys(out).forEach(k=>{ if(out[k]===undefined) delete it[k]; else it[k]=out[k]; });
+  if(eraAuto&&it.articulo===previo) it.articulo=nombreAuto(it.categoria,{...it,articulo:undefined});   // lo mantiene al día si cambia medida/tipo
+  if(!it.articulo) it.articulo=previo||nombreAuto(it.categoria,out);
+  await persistInv(); closeModal(); render(); toast('Herramienta actualizada');
+}
+window.openAddItemModal=openAddItemModal; window.submitAddItem=submitAddItem;
+window.openEditModal=openEditModal; window.submitEdit=submitEdit;
+window.onNiCatChange=onNiCatChange; window.selTab=selTab; window.onMedidaChange=onMedidaChange; window.onCampoChange=onCampoChange;
+window.onMedidaSel=onMedidaSel; window.fmtOtro=fmtOtro; window.onSelChange=onSelChange;
+
+/* =========================================================================
+   BUSCAR, ALERTAS, AJUSTES, BAJAS, EQUIVALENCIAS, EXPORTAR, IMPORTAR
+   ========================================================================= */
+
+/* ---- Buscador global ---- */
+function onGlobalSearch(){
+  const v=document.getElementById('globalSearch').value.trim();
+  state.searchQuery=v;
+  document.getElementById('searchClearBtn').style.display=v?'':'none';
+  render();
+}
+function clearGlobalSearch(){
+  const inp=document.getElementById('globalSearch'); if(inp) inp.value='';
+  state.searchQuery='';
+  document.getElementById('searchClearBtn').style.display='none';
+  render();
+}
+window.onGlobalSearch=onGlobalSearch; window.clearGlobalSearch=clearGlobalSearch;
+
+function renderSearchResults(){
+  const q=state.searchQuery.toLowerCase();
+  const matches=INVENTARIO.filter(it=>{
+    const l=deriveSizeLabel(it).toLowerCase();
+    const mm=deriveMM(it);
+    return l.includes(q)||(it.articulo||'').toLowerCase().includes(q)||(it.codigo||'').toLowerCase().includes(q)||(it.ubicacion||'').toLowerCase().includes(q)||(it.descripcion||'').toLowerCase().includes(q)||(catCfg(it.categoria).label||'').toLowerCase().includes(q)
+      ||(mm!=null&&String(mm).includes(q));
+  });
+  return `<div class="section-head">
+    <h2 class="section-title">Resultados: "${escHtml(state.searchQuery)}"</h2>
+    <span class="section-meta">${matches.length} resultado(s) · ${sumCantidad(matches)} pzas</span>
+  </div>${matches.length?renderItemList(matches):emptyState('No se encontró nada con esa medida o nombre.')}`;
+}
+
+/* ---- Alertas ---- */
+function renderAlertas(){
+  const low=lowStockGroups();
+  const lowVU=lowVidaUtil();
+  const zeroItems=INVENTARIO.filter(it=>(Number(it.cantidad)||0)===0);
+  const head=`<div class="section-head"><h2 class="section-title">Alertas de inventario</h2></div>`;
+  const stockHtml=`<div class="settings-group"><h4>Bajo el mínimo (${low.length})</h4>
+    ${low.length?low.map(g=>`<div class="settings-row">
+      <div><div class="srname">${escHtml(catCfg(g.categoria).label+(g.tipo?' · '+g.tipo:'')+' · '+g.sizeLabel)}</div>
+        <div class="srstat" style="color:var(--danger)">Actual: ${g.total} · Mínimo: ${g.min}</div></div>
+      <button class="btn btn-sm btn-danger" onclick="goToGroup('${g.categoria}',${g.tipo?`'${escAttr(g.tipo)}'`:'null'},'${escAttr(g.sizeLabel)}')">Ver</button>
+    </div>`).join(''):emptyState('Sin stock bajo. Configura mínimos en Ajustes.')}</div>`;
+  const vuHtml=`<div class="settings-group"><h4>Vida útil crítica ≤20% (${lowVU.length})</h4>
+    ${lowVU.length?renderItemList(lowVU):emptyState('Sin herramientas con vida útil crítica.')}</div>`;
+  const zeroHtml=`<div class="settings-group"><h4>Sin existencia — 0 pzas (${zeroItems.length})</h4>
+    ${zeroItems.length?renderItemList(zeroItems):emptyState('No hay referencias en cero.')}</div>`;
+  return head+stockHtml+vuHtml+zeroHtml;
+}
+
+/* ---- Ajustes ---- */
+function renderSettings(){
+  const groups=computeGroupTotals();
+  const byCat={};
+  Object.values(groups).forEach(g=>{ (byCat[g.categoria]=byCat[g.categoria]||[]).push(g); });
+  const html=Object.entries(byCat).map(([cat,arr])=>{
+    arr.sort((a,b)=>(a.tipo||'').localeCompare(b.tipo||'')||a.sizeLabel.localeCompare(b.sizeLabel,'es',{numeric:true}));
+    return `<div class="settings-group"><h4>${escHtml(catCfg(cat).label)}</h4>
+      ${arr.map(g=>`<div class="settings-row">
+        <div><div class="srname">${g.tipo?escHtml(g.tipo)+' · ':''}${escHtml(formatSizeLabel(g.sizeLabel))}</div>
+          <div class="srstat">Actual: ${g.total} pzas</div></div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <label style="font-size:11px;color:var(--text-dim);">Mínimo</label>
+          <input type="number" min="0" data-minkey="${escAttr(g.key)}" value="${g.min??''}" placeholder="—" onchange="updateMinimo(this)">
+        </div></div>`).join('')}
+    </div>`;
+  }).join('');
+  return `<div class="section-head"><h2 class="section-title">Ajustes de stock mínimo</h2></div>
+    <p class="hint" style="color:var(--text-dim);font-size:13px;margin-bottom:18px;">
+      Cuando la cantidad total caiga debajo del mínimo, aparecerá una alerta en Inicio.</p>
+    ${html||emptyState('No hay medidas registradas todavía.')}`;
+}
+async function updateMinimo(input){
+  const key=input.dataset.minkey;
+  const val=input.value===''?null:Number(input.value);
+  if(val===null) delete MINIMOS[key]; else MINIMOS[key]=val;
+  await persistMinimos(); toast('Mínimo actualizado');
+}
+window.updateMinimo=updateMinimo;
+
+/* ---- Bajas ---- */
+function renderBajas(){
+  const rows=BAJAS.slice().sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
+  const total=rows.reduce((s,r)=>s+(r.cantidad||0),0);
+  return `<div class="section-head"><h2 class="section-title">Bajas</h2>
+    <span class="section-meta">${rows.length} movimientos · ${total} pzas</span></div>
+    <div class="section-actions" style="margin-bottom:14px;">
+      <button class="btn btn-teal" onclick="openExportModal('bajas')">⬇ Descargar bajas</button>
+    </div>
+    ${rows.length?`<table class="data-table"><thead><tr>
+      <th>Fecha</th><th>Categoría</th><th>Artículo</th><th>Medida</th><th>Cant.</th><th>Motivo</th>
+    </tr></thead><tbody>
+      ${rows.map(r=>`<tr>
+        <td class="mono">${new Date(r.fecha).toLocaleDateString('es-MX')}</td>
+        <td>${escHtml(catCfg(r.categoria).label||r.categoria)}</td>
+        <td>${escHtml(r.articulo)}</td>
+        <td class="mono">${escHtml(r.medida||'—')}</td>
+        <td class="mono">${r.cantidad}</td>
+        <td>${escHtml(r.motivo||'—')}</td>
+      </tr>`).join('')}
+    </tbody></table>`:emptyState('Sin bajas registradas todavía.')}`;
+}
+
+/* ---- Equivalencias ---- */
+const EQUIVALENCIAS=[
+  ['1/64','0.0156','0.397'],['1/32','0.031','0.794'],['1/16','0.0625','1.588'],['3/32','0.094','2.381'],
+  ['1/8','0.125','3.175'],['5/32','0.156','3.969'],['3/16','0.1875','4.763'],['7/32','0.219','5.556'],
+  ['1/4','0.25','6.350'],['5/16','0.3125','7.938'],['3/8','0.375','9.525'],['7/16','0.4375','11.113'],
+  ['1/2','0.5','12.700'],['9/16','0.5625','14.288'],['5/8','0.625','15.875'],
+  ['3/4','0.75','19.050'],['7/8','0.875','22.225'],['1','1.0','25.400']
+];
+function renderEquivalencias(){
+  return `<div class="section-head"><h2 class="section-title">Tabla de equivalencias</h2></div>
+    <p class="hint" style="color:var(--text-dim);font-size:13px;margin-bottom:14px;">Fracción · decimal (in) · milímetros</p>
+    <table class="data-table"><thead><tr><th>Fracción</th><th>Decimal (in)</th><th>Milímetros</th></tr></thead>
+    <tbody>${EQUIVALENCIAS.map(e=>`<tr><td class="mono">${e[0]}"</td><td class="mono">${e[1]}</td><td class="mono">${e[2]} mm</td></tr>`).join('')}</tbody></table>`;
+}
+
+/* =========================================================================
+   EXPORTAR — Excel y PDF con selección de categorías y nivel
+   ========================================================================= */
+const FULL_HDR=['Categoría','Tipo','Artículo','Medida','Equiv.mm','Filo(mm)','Long.(mm)','Empaque','Cantidad','Vida útil %','Ubicación','Detalles','Notas'];
+const SIMP_HDR=['Categoría','Tipo','Artículo','Medida','Equiv.mm','Filo(mm)','Long.(mm)','Cantidad','Ubicación'];
+const BAJA_HDR=['Fecha','Categoría','Artículo','Medida','Cantidad','Motivo'];
+
+function itFull(it){ return [catCfg(it.categoria).label,deriveTipo(it)||'',it.articulo||'',
+  deriveSizeLabel(it)==='Sin medida'?'':deriveSizeLabel(it),deriveMM(it)??'',
+  it.largoFilo??'',it.longitudTotal??'',it.piezasEmpaque??'',it.cantidad??0,it.vidaUtil??'',it.ubicacion||'',detallesItem(it).join(' · '),it.notas||'']; }
+function itSimp(it){ return [catCfg(it.categoria).label,deriveTipo(it)||'',it.articulo||'',
+  deriveSizeLabel(it)==='Sin medida'?'':deriveSizeLabel(it),deriveMM(it)??'',it.largoFilo??'',it.longitudTotal??'',it.cantidad??0,it.ubicacion||'']; }
+function bRow(r){ return [new Date(r.fecha).toLocaleDateString('es-MX'),catCfg(r.categoria).label||r.categoria,r.articulo||'',r.medida||'',r.cantidad,r.motivo||'']; }
+
+function openExportModal(kind){
+  const src=kind==='inventario'?INVENTARIO:BAJAS;
+  const cats=[...new Set(src.map(i=>i.categoria))].filter(c=>CAT_ORDER.includes(c));
+  if(!cats.length){ toast('No hay datos para exportar',true); return; }
+  openModal(`<div class="modal">
+    <h3>Descargar ${kind==='inventario'?'inventario':'bajas'}</h3>
+    <p class="hint">Elige qué categorías incluir.</p>
+    <div class="field">
+      <label style="display:flex;align-items:center;gap:7px;"><input type="checkbox" id="expAll" checked onchange="toggleAllCats(this)"> Todas las categorías</label>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px 18px;border-top:1px solid var(--border-soft);border-bottom:1px solid var(--border-soft);padding:10px 0;margin-bottom:12px;">
+      ${cats.map(c=>`<label style="display:flex;align-items:center;gap:6px;font-size:13px;">
+        <input type="checkbox" class="expCat" value="${c}" checked onchange="syncExpAll()"> ${escHtml(catCfg(c).label)}</label>`).join('')}
+    </div>
+    ${kind==='inventario'?`<div class="field"><label>Nivel de detalle</label>
+      <select id="expMode">
+        <option value="completo">Completo — todos los datos técnicos</option>
+        <option value="simple">Simple — tipo, medida, filo, longitud, cantidad</option>
+      </select></div>`:''}
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-teal" onclick="runExport('${kind}','pdf')">PDF</button>
+      <button class="btn btn-primary" onclick="runExport('${kind}','excel')">Excel</button>
+    </div></div>`);
+}
+function toggleAllCats(cb){ document.querySelectorAll('.expCat').forEach(c=>c.checked=cb.checked); }
+function syncExpAll(){ const all=document.querySelectorAll('.expCat'),chk=document.querySelectorAll('.expCat:checked'); document.getElementById('expAll').checked=all.length===chk.length; }
+function getSelCats(){ return [...document.querySelectorAll('.expCat:checked')].map(c=>c.value); }
+window.openExportModal=openExportModal; window.toggleAllCats=toggleAllCats; window.syncExpAll=syncExpAll;
+
+async function runExport(kind,fmt){
+  const cats=getSelCats(); if(!cats.length){ toast('Selecciona al menos una categoría',true); return; }
+  if(kind==='inventario'){
+    const mode=document.getElementById('expMode').value;
+    const items=INVENTARIO.filter(i=>cats.includes(i.categoria));
+    closeModal();
+    if(fmt==='excel') await exportInvExcel(items,mode); else exportInvPDF(items,mode);
+  } else {
+    const rows=BAJAS.filter(r=>cats.includes(r.categoria));
+    closeModal();
+    if(fmt==='excel') await exportBajasExcel(rows); else exportBajasPDF(rows);
+  }
+}
+window.runExport=runExport;
+
+async function buildWb(title,subtitle,headers,rows,accent){
+  const wb=new ExcelJS.Workbook(); wb.creator='AGSA';
+  const ws=wb.addWorksheet('Datos',{views:[{state:'frozen',ySplit:4}]});
+  ws.mergeCells(1,1,1,headers.length);
+  const tc=ws.getCell(1,1); tc.value=title;
+  tc.font={name:'Calibri',size:15,bold:true,color:{argb:'FF1F2226'}}; ws.getRow(1).height=26;
+  ws.mergeCells(2,1,2,headers.length);
+  const sc=ws.getCell(2,1); sc.value=subtitle;
+  sc.font={name:'Calibri',size:9,italic:true,color:{argb:'FF6D747B'}}; ws.getRow(2).height=18;
+  ws.addRow([]);
+  const hr=ws.addRow(headers);
+  hr.eachCell(c=>{ c.font={bold:true,color:{argb:'FFFFFFFF'},size:10}; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:accent||'FF1F2226'}}; c.alignment={vertical:'middle',horizontal:'center'}; c.border={bottom:{style:'thin'}}; }); hr.height=22;
+  rows.forEach((r,i)=>{
+    const row=ws.addRow(r); const even=i%2===0;
+    row.eachCell(c=>{ c.alignment={vertical:'middle'}; c.font={size:9.5,color:{argb:'FF1A1F24'}}; c.border={bottom:{style:'hair',color:{argb:'FFE0E0DD'}}};
+      if(even) c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF5F5F3'}}; });
+  });
+  headers.forEach((_,i)=>{ let max=String(headers[i]).length; rows.forEach(r=>{ const v=r[i]; if(v!=null&&v!=='') max=Math.max(max,String(v).length); }); ws.getColumn(i+1).width=Math.min(Math.max(max+3,11),38); });
+  ws.autoFilter={from:{row:4,column:1},to:{row:4,column:headers.length}};
+  return wb;
+}
+async function dlWb(wb,name){ const buf=await wb.xlsx.writeBuffer(); const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000); }
+
+async function exportInvExcel(items,mode){
+  const hdrs=mode==='simple'?SIMP_HDR:FULL_HDR;
+  const rows=items.map(mode==='simple'?itSimp:itFull);
+  const sub=`Generado ${new Date().toLocaleString('es-MX')} · ${items.length} refs · ${sumCantidad(items)} pzas`;
+  const wb=await buildWb('AGSA · Inventario CNC',sub,hdrs,rows,'FF1E2328');
+  await dlWb(wb,`inventario_agsa_${todayStr()}.xlsx`); toast('Excel generado');
+}
+async function exportBajasExcel(rows){
+  const data=rows.map(bRow); const sub=`Generado ${new Date().toLocaleString('es-MX')} · ${rows.length} movimientos`;
+  const wb=await buildWb('AGSA · Bajas de inventario',sub,BAJA_HDR,data,'FF5C2723');
+  await dlWb(wb,`bajas_agsa_${todayStr()}.xlsx`); toast('Excel de bajas generado');
+}
+window.exportInvExcel=exportInvExcel; window.exportBajasExcel=exportBajasExcel;
+
+function pdfHeader(doc,sub){
+  doc.setFillColor(36,40,44); doc.roundedRect(30,16,18,18,3,3,'F');
+  doc.setTextColor(242,165,60); doc.setFont(undefined,'bold'); doc.setFontSize(11); doc.text('A',39,29,{align:'center'});
+  doc.setTextColor(30,35,40); doc.setFontSize(15); doc.text('AGSA',54,25);
+  doc.setFont(undefined,'normal'); doc.setFontSize(8); doc.setTextColor(100,108,115); doc.text(sub,54,35);
+  doc.setDrawColor(200,205,210); doc.line(30,44,doc.internal.pageSize.getWidth()-30,44);
+}
+function pdfPageNums(doc){ const tot=doc.internal.getNumberOfPages(),w=doc.internal.pageSize.getWidth(),h=doc.internal.pageSize.getHeight(); for(let i=1;i<=tot;i++){ doc.setPage(i); doc.setFontSize(7.5); doc.setTextColor(150); doc.text(`AGSA · Inventario CNC — pág. ${i} de ${tot}`,w-30,h-14,{align:'right'}); } }
+
+function exportInvPDF(items,mode){
+  const hdrs=mode==='simple'?SIMP_HDR:FULL_HDR;
+  const rows=items.map(mode==='simple'?itSimp:itFull);
+  const orient=hdrs.length>8?'landscape':'portrait';
+  const {jsPDF}=window.jspdf; const doc=new jsPDF({orientation:orient,unit:'pt',format:'letter'});
+  pdfHeader(doc,`Inventario de herramientas · ${items.length} refs · ${sumCantidad(items)} pzas · ${new Date().toLocaleString('es-MX')}`);
+  doc.autoTable({startY:54,head:[hdrs],body:rows,theme:'striped',
+    styles:{fontSize:mode==='simple'?9:7,cellPadding:4,overflow:'linebreak',valign:'middle',lineColor:[220,222,218],lineWidth:0.4},
+    headStyles:{fillColor:[36,40,44],textColor:255,halign:'center',fontSize:mode==='simple'?9.5:7.5},
+    alternateRowStyles:{fillColor:[245,246,243]},margin:{left:28,right:28,top:54,bottom:30}});
+  pdfPageNums(doc); doc.save(`inventario_agsa_${todayStr()}.pdf`); toast('PDF generado');
+}
+function exportBajasPDF(rows){
+  const data=rows.map(bRow); const {jsPDF}=window.jspdf; const doc=new jsPDF({orientation:'landscape',unit:'pt',format:'letter'});
+  pdfHeader(doc,`Bajas de inventario · ${rows.length} movimientos · ${new Date().toLocaleString('es-MX')}`);
+  doc.autoTable({startY:54,head:[BAJA_HDR],body:data,theme:'striped',
+    styles:{fontSize:9,cellPadding:4,overflow:'linebreak',valign:'middle'},
+    headStyles:{fillColor:[92,39,35],textColor:255,halign:'center'},
+    alternateRowStyles:{fillColor:[248,242,241]},margin:{left:28,right:28,top:54,bottom:30}});
+  pdfPageNums(doc); doc.save(`bajas_agsa_${todayStr()}.pdf`); toast('PDF de bajas generado');
+}
+window.exportInvPDF=exportInvPDF; window.exportBajasPDF=exportBajasPDF;
+
+/* =========================================================================
+   IMPORTAR EXCEL
+   ========================================================================= */
+function downloadPlantilla(){
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet([FULL_HDR,
+    ['Cortadores','Bola','Cortador Bola 1/8" (3.175 mm)','1/8"',3.175,12,38,1,3,100,'Almacén','',''],
+    ['Brocas','','Broca 1/4"','1/4"',6.35,'',88,1,1,'','Almacén','','']]);
+  XLSX.utils.book_append_sheet(wb,ws,'Plantilla');
+  XLSX.writeFile(wb,'plantilla_inventario_agsa.xlsx');
+}
+window.downloadPlantilla=downloadPlantilla;
+
+function openImportModal(){
+  openModal(`<div class="modal">
+    <h3>Importar inventario desde Excel</h3>
+    <p class="hint"><b style="color:var(--danger)">Reemplaza todo</b> el inventario actual con el contenido del archivo. Usa las mismas columnas del Excel descargado (modo Completo). Soporta .xlsx, .xls y .csv.</p>
+    <div class="drop-zone"><input type="file" id="importFile" accept=".xlsx,.xls,.csv"></div>
+    <button class="btn btn-sm" onclick="downloadPlantilla()">Descargar plantilla de ejemplo</button>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-danger" onclick="submitImport()">Reemplazar inventario</button>
+    </div></div>`);
+}
+window.openImportModal=openImportModal;
+
+async function submitImport(){
+  const f=document.getElementById('importFile').files[0]; if(!f){ toast('Selecciona un archivo',true); return; }
+  try{
+    const buf=await f.arrayBuffer(); const wb=XLSX.read(buf,{type:'array'});
+    const sheet=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(sheet,{defval:''});
+    const items=rows.map(row=>{
+      const g=k=>{ for(const rk of Object.keys(row)){ if(rk.trim().toLowerCase()===k.toLowerCase()) return row[rk]; } return ''; };
+      const catRaw=String(g('Categoría')||g('categoria')||'').toLowerCase().trim();
+      let cat=catRaw;
+      const mk=findCatKey(catRaw);
+      if(mk) cat=mk; else if(!cat) cat='otros';
+      const med=String(g('Medida')||g('medida')||'').trim();
+      let decimal=null,mm=null;
+      const frac=med.match(/(\d+)\/(\d+)/); const mmt=med.match(/(\d+(?:\.\d+)?)\s*mm/i);
+      if(frac){decimal=parseInt(frac[1])/parseInt(frac[2]);mm=+(decimal*25.4).toFixed(3);}
+      else if(mmt){mm=parseFloat(mmt[1]);decimal=mm/25.4;}
+      const tipo=String(g('Tipo')||g('tipo')||'').trim();
+      const vidaUtilRaw=g('Vida útil %')||g('vidaUtil')||g('Vida util %')||'';
+      return {
+        id:genId('itm'),categoria:cat,
+        articulo:String(g('Artículo')||g('articulo')||'').trim(),
+        tipoHerramienta:tipo||undefined,
+        ubicacion:String(g('Ubicación')||g('ubicacion')||'').trim()||undefined,
+        diametro:{display:med,decimal,mm},
+        largoFilo:g('Filo(mm)')||g('Largo de filo (mm)')?Number(g('Filo(mm)')||g('Largo de filo (mm)')):undefined,
+        longitudTotal:g('Long.(mm)')||g('Longitud total (mm)')?Number(g('Long.(mm)')||g('Longitud total (mm)')):undefined,
+        piezasEmpaque:g('Empaque')||g('Piezas por empaque')?Number(g('Empaque')||g('Piezas por empaque')):undefined,
+        cantidad:Number(g('Cantidad')||g('cantidad'))||0,
+        vidaUtil:vidaUtilRaw!==''?Number(vidaUtilRaw):undefined,
+        notas:String(g('Notas')||g('notas')||'').trim()
+      };
+    }).filter(it=>it.articulo||it.categoria);
+    if(!items.length){ toast('No se encontraron filas válidas',true); return; }
+    INVENTARIO=items; await persistInv(); closeModal(); goHome(); toast(`Inventario importado: ${items.length} referencias`);
+  }catch(e){ console.error(e); toast('No se pudo leer el archivo',true); }
+}
+window.submitImport=submitImport;
+
+/* =========================================================================
+   INICIO
+   ========================================================================= */
+(async function init(){
+  await loadAll();
+  render();
+})();
+</script>
+</body>
+</html>
